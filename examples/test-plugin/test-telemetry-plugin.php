@@ -61,11 +61,16 @@ function test_telemetry_init() {
         // DON'T call init() to skip consent notice and deactivation modal
         // Just store the client for manual tracking
         
-        // Store in global for access in other functions
-        $GLOBALS['test_telemetry_client'] = $telemetry;
+        // The SDK automatically stores the client in a plugin-specific global variable
+        // For this plugin (test-telemetry-plugin), it will be stored as:
+        // $GLOBALS['test_telemetry_plugin_telemetry_client']
         
-        // Manually set consent to 'yes' for testing (bypass consent check)
-        update_option('test_telemetry_plugin_telemetry_opt_in', 'yes');
+        // You can also access it via the helper function:
+        // $client = coderex_telemetry(__FILE__);
+        
+        // Manually set opt-in to 'yes' for testing (bypass opt-in check)
+        // Option name is plugin-specific: {plugin-folder-name}_allow_tracking
+        update_option('test-telemetry-plugin_allow_tracking', 'yes');
         
     } catch (Exception $e) {
         error_log('Test Telemetry Plugin: Failed to initialize - ' . $e->getMessage());
@@ -81,7 +86,7 @@ add_action('plugins_loaded', 'test_telemetry_init');
  */
 function test_telemetry_track_post_published($post_id) {
     if (function_exists('coderex_telemetry_track')) {
-        coderex_telemetry_track('post_published', [
+        coderex_telemetry_track(__FILE__, 'post_published', [
             'post_id' => $post_id,
             'post_type' => get_post_type($post_id),
         ]);
@@ -169,8 +174,8 @@ function test_telemetry_admin_page() {
         error_log('Test Plugin - Properties before tracking: ' . print_r($properties, true));
         
         if (function_exists('coderex_telemetry_track')) {
-            $result = coderex_telemetry_track($event_name, $properties);
-            $message = $result ? 'Event tracked successfully with profile identification!' : 'Event tracking failed. Check consent status.';
+            $result = coderex_telemetry_track(__FILE__, $event_name, $properties);
+            $message = $result ? 'Event tracked successfully with profile identification!' : 'Event tracking failed. Check opt-in status.';
             echo '<div class="notice notice-' . ($result ? 'success' : 'error') . '"><p>' . esc_html($message) . '</p></div>';
         }
     }
@@ -282,14 +287,25 @@ function test_telemetry_admin_page() {
         <div class="card">
             <h2>Debug Information</h2>
             <p><strong>Plugin File:</strong> <?php echo esc_html(__FILE__); ?></p>
+            <p><strong>Plugin Folder:</strong> test-telemetry-plugin</p>
             <p><strong>Plugin Version:</strong> 1.0.0</p>
             <p><strong>SDK Loaded:</strong> <?php echo class_exists('CodeRex\Telemetry\Client') ? '✓ Yes' : '✗ No'; ?></p>
             <p><strong>Helper Functions:</strong> <?php echo function_exists('coderex_telemetry_track') ? '✓ Available' : '✗ Not Available'; ?></p>
-            <?php if (isset($GLOBALS['test_telemetry_client'])): ?>
+            <?php 
+            // Check if client is initialized using the plugin-specific global variable
+            $client = isset($GLOBALS['test_telemetry_plugin_telemetry_client']) ? $GLOBALS['test_telemetry_plugin_telemetry_client'] : null;
+            ?>
+            <?php if ($client): ?>
                 <p style="color: green;"><strong>✓ Telemetry Client Initialized</strong></p>
+                <p><strong>Global Variable:</strong> <code>$GLOBALS['test_telemetry_plugin_telemetry_client']</code></p>
             <?php else: ?>
                 <p style="color: red;"><strong>✗ Telemetry Client Not Initialized</strong></p>
             <?php endif; ?>
+            <p><strong>Opt-in Option:</strong> <code>test-telemetry-plugin_allow_tracking</code></p>
+            <p><strong>Opt-in Status:</strong> <?php 
+                $opt_in = get_option('test-telemetry-plugin_allow_tracking', 'no');
+                echo $opt_in === 'yes' ? '<span style="color: green;">✓ Enabled</span>' : '<span style="color: red;">✗ Disabled</span>';
+            ?></p>
         </div>
     </div>
     

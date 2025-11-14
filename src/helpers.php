@@ -8,41 +8,43 @@
 
 if (!function_exists('coderex_telemetry')) {
     /**
-     * Get the singleton instance of the Telemetry Client
+     * Get the Telemetry Client instance for a specific plugin
      *
-     * This function returns the global Client instance. The Client must be
-     * initialized elsewhere in the plugin before calling this function.
+     * This function returns the Client instance for the specified plugin file.
+     * The Client must be initialized elsewhere in the plugin before calling this function.
      *
+     * @param string $plugin_file The main plugin file path (use __FILE__ from your main plugin file)
      * @return \CodeRex\Telemetry\Client|null The Client instance or null if not initialized
      * @since 1.0.0
      */
-    function coderex_telemetry() {
-        global $coderex_telemetry_client;
-        return $coderex_telemetry_client ?? null;
+    function coderex_telemetry(string $plugin_file) {
+        error_log(print_r($plugin_file, true));
+        return \CodeRex\Telemetry\Client::getInstance($plugin_file);
     }
 }
 
 if (!function_exists('coderex_telemetry_track')) {
     /**
-     * Track a telemetry event
+     * Track a telemetry event for a specific plugin
      *
      * This is a convenience function that calls the track() method on the
-     * global Client instance. If the Client is not initialized or consent
-     * is not granted, the event will not be sent.
+     * plugin's Client instance. If the Client is not initialized or opt-in
+     * is not enabled, the event will not be sent.
      *
+     * @param string $plugin_file The main plugin file path (use __FILE__ from your main plugin file)
      * @param string $event The event name (alphanumeric and underscores only)
      * @param array  $properties Optional array of event properties
      *
      * @return bool True if event was sent successfully, false otherwise
      * @since 1.0.0
      */
-    function coderex_telemetry_track(string $event, array $properties = []): bool {
-        $client = coderex_telemetry();
+    function coderex_telemetry_track(string $plugin_file, string $event, array $properties = []): bool {
+        $client = coderex_telemetry($plugin_file);
 
         if ($client === null) {
             return false;
         }
-        
+
         return $client->track($event, $properties);
     }
 }
