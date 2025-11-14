@@ -23,15 +23,28 @@ The CodeRex Telemetry SDK is a Composer package that provides privacy-first tele
 
 ## Installation
 
-### Step 1: Install via Composer
+### Step 1: Configure Composer
+
+Add the VCS repository to your `composer.json`:
+
+```json
+"repositories": [
+  {
+    "type": "vcs",
+    "url": "https://github.com/CODEREXLTD/coderex-telemetry"
+  }
+]
+```
+
+### Step 2: Install via Composer
 
 In your WordPress plugin directory, run:
 
 ```bash
-composer require coderexltd/telemetry
+composer require coderexltd/telemetry:dev-master
 ```
 
-### Step 2: Require Autoloader
+### Step 3: Require Autoloader
 
 In your main plugin file, require the Composer autoloader:
 
@@ -67,6 +80,7 @@ use CodeRex\Telemetry\Client;
 // Initialize the telemetry client
 $telemetry = new Client(
     'your-openpanel-api-key-here',  // Your OpenPanel API key
+    'your-openpanel-secret-key-here',
     'My Awesome Plugin',             // Your plugin name
     __FILE__                         // Plugin file path
 );
