@@ -119,18 +119,6 @@ class Client {
         $this->storeGlobalInstance();
     }
 
-    /**
-     * Initialize the telemetry SDK
-     *
-     * Sets up WordPress hooks and schedules background reporting.
-     * Should be called after instantiation.
-     *
-     * @return void
-     * @since 1.0.0
-     */
-    public function init(): void {
-        $this->setupHooks();
-    }
 
     /**
      * Track a custom event
@@ -165,18 +153,6 @@ class Client {
     private function isOptInEnabled(): bool {
         $opt_in = get_option( $this->slug.'_allow_tracking', 'no' );
         return $opt_in === 'yes';
-    }
-
-    /**
-     * Set up WordPress hooks
-     *
-     * Registers hooks for background reporting.
-     *
-     * @return void
-     * @since 1.0.0
-     */
-    private function setupHooks(): void {
-        // No consent or deactivation hooks needed
     }
 
     /**
