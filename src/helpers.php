@@ -18,7 +18,6 @@ if (!function_exists('coderex_telemetry')) {
      * @since 1.0.0
      */
     function coderex_telemetry(string $plugin_file) {
-        error_log(print_r($plugin_file, true));
         return \CodeRex\Telemetry\Client::getInstance($plugin_file);
     }
 }
