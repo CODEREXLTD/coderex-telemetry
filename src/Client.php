@@ -82,6 +82,14 @@ class Client {
     private EventDispatcher $dispatcher;
 
     /**
+     * Whether lifecycle tracking is initialized
+     *
+     * @var bool
+     * @since 1.0.0
+     */
+    private bool $lifecycleTrackingInitialized = false;
+
+    /**
      * Constructor
      *
      * Initializes the telemetry client with API key, plugin name, and plugin file path.
@@ -113,10 +121,13 @@ class Client {
         $driver->setApiSecret( $apiSecret );
 
         // Initialize EventDispatcher
-        $this->dispatcher = new EventDispatcher( $driver, $pluginName, $this->pluginVersion );
+        $this->dispatcher = new EventDispatcher( $driver, $pluginName, $this->pluginVersion, $this->slug );
 
         // Store instance in global variable with plugin-specific name
         $this->storeGlobalInstance();
+
+        // Initialize lifecycle tracking
+        $this->initLifecycleTracking();
     }
 
 
@@ -264,5 +275,93 @@ class Client {
         $safe_slug = str_replace( '-', '_', $slug );
         $global_name = $safe_slug . '_telemetry_client';
         return $GLOBALS[ $global_name ] ?? null;
+    }
+
+    /**
+     * Initialize lifecycle tracking
+     *
+     * Sets up automatic tracking for plugin activation and deactivation events.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    private function initLifecycleTracking(): void {
+        if ( $this->lifecycleTrackingInitialized ) {
+            return;
+        }
+
+        // Register activation hook
+        register_activation_hook( $this->pluginFile, array( $this, 'handlePluginActivation' ) );
+
+        // Register deactivation hook
+        register_deactivation_hook( $this->pluginFile, array( $this, 'handlePluginDeactivation' ) );
+
+        $this->lifecycleTrackingInitialized = true;
+    }
+
+    /**
+     * Handle plugin activation event
+     *
+     * Automatically triggered when the plugin is activated.
+     * Tracks the activation event with site_url.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function handlePluginActivation(): void {
+        // Store activation time
+        $activation_time = time();
+        update_option( $this->slug . '_activated_time', $activation_time, false );
+
+        // Track activation event (bypass opt-in check for lifecycle events)
+        $this->dispatcher->dispatchLifecycleEvent( 'plugin_activated', array(
+            'site_url' => Utils::getSiteUrl(),
+            'activation_time' => gmdate( 'c', $activation_time ),
+        ) );
+    }
+
+    /**
+     * Handle plugin deactivation event
+     *
+     * Automatically triggered when the plugin is deactivated.
+     * Tracks the deactivation event with usage_duration and last_core_action.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function handlePluginDeactivation(): void {
+        // Calculate usage duration
+        $activation_time = get_option( $this->slug . '_activated_time', 0 );
+        $usage_duration = 0;
+        if ( $activation_time > 0 ) {
+            $usage_duration = time() - $activation_time;
+        }
+
+        // Get last core action
+        $last_core_action = get_option( $this->slug . '_last_core_action', '' );
+
+        // Track deactivation event (bypass opt-in check for lifecycle events)
+        $this->dispatcher->dispatchLifecycleEvent( 'plugin_deactivated', array(
+            'usage_duration' => $usage_duration,
+            'last_core_action' => $last_core_action,
+            'deactivation_time' => gmdate( 'c' ),
+        ) );
+
+        // Clean up activation time option
+        delete_option( $this->slug . '_activated_time' );
+    }
+
+    /**
+     * Update last core action
+     *
+     * Updates the last core action performed by the user.
+     * This is used to track what the user was doing before deactivation.
+     *
+     * @param string $action The core action name
+     * @return void
+     * @since 1.0.0
+     */
+    public function updateLastCoreAction( string $action ): void {
+        update_option( $this->slug . '_last_core_action', $action, false );
     }
 }

@@ -62,3 +62,29 @@ if (!function_exists('coderex_telemetry_generate_profile_id')) {
         return \CodeRex\Telemetry\Helpers\Utils::generateProfileId();
     }
 }
+
+if (!function_exists('coderex_telemetry_update_last_action')) {
+    /**
+     * Update the last core action for a plugin
+     *
+     * This updates the last core action performed, which will be included
+     * in the deactivation event to understand what the user was doing
+     * before deactivating the plugin.
+     *
+     * @param string $plugin_file The main plugin file path
+     * @param string $action The action name (e.g., 'feed_created', 'settings_saved')
+     *
+     * @return bool True on success, false on failure
+     * @since 1.0.0
+     */
+    function coderex_telemetry_update_last_action(string $plugin_file, string $action): bool {
+        $client = coderex_telemetry($plugin_file);
+
+        if ($client === null) {
+            return false;
+        }
+
+        $client->updateLastCoreAction($action);
+        return true;
+    }
+}

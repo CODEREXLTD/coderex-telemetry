@@ -16,10 +16,11 @@ The SDK's core purpose is to handle data transmission securely and ethically. De
 
 ## Features
 
-- **Privacy-First**: No data is sent without explicit user consent
+- **Privacy-First**: No data is sent without explicit user consent (except lifecycle events)
 - **Easy Integration**: Simple API with just a few lines of code
-- **Automatic Events**: Tracks install, deactivation, and weekly system info
+- **Automatic Lifecycle Events**: Automatically tracks plugin activation and deactivation
 - **Custom Events**: Track plugin-specific events with custom properties
+- **Usage Metrics**: Automatic calculation of usage duration and last action tracking
 - **WordPress Native**: Uses WordPress APIs and follows WordPress coding standards
 - **Secure**: HTTPS-only transmission, nonce verification, input sanitization
 
@@ -105,11 +106,42 @@ add_action('my_plugin_course_created', function($course_id) {
 
 ### What Happens Next?
 
-1. **User Activation**: When a user activates your plugin, they'll see a consent notice from Appsero
-2. **User Choice**: They can click "Allow" to opt in or "No thanks" to opt out
-3. **Automatic Tracking**: If they opt in, the SDK automatically sends:
-   - Install event (one time)
-4. **Custom Events**: Your custom `coderex_telemetry_track()` calls will also be sent (only if opted in)
+1. **Automatic Lifecycle Tracking**: The SDK immediately starts tracking activation/deactivation
+2. **User Consent Notice**: When a user activates your plugin, they'll see a consent notice from Appsero
+3. **User Choice**: They can click "Allow" to opt in or "No thanks" to opt out
+4. **Custom Events**: Your custom `coderex_telemetry_track()` calls will be sent only if opted in
+
+### Automatic Lifecycle Events
+
+The SDK automatically tracks these events **without requiring opt-in**:
+
+- **`plugin_activated`**: When the plugin is activated
+  - Includes: `site_url`, `activation_time`
+  
+- **`plugin_deactivated`**: When the plugin is deactivated
+  - Includes: `usage_duration`, `last_core_action`, `deactivation_time`
+
+**Why no opt-in required?** Lifecycle events are essential for understanding plugin adoption and uninstallation reasons. They contain no personal data.
+
+For detailed information, see [Lifecycle Events Documentation](LIFECYCLE_EVENTS.md).
+
+### Tracking Core Actions (Recommended)
+
+To make deactivation analytics more meaningful, update the last core action when users perform important activities:
+
+```php
+// When user creates their first item
+coderex_telemetry_update_last_action( __FILE__, 'first_item_created' );
+
+// When user configures settings
+coderex_telemetry_update_last_action( __FILE__, 'settings_saved' );
+
+// Before tracking any core event
+coderex_telemetry_update_last_action( __FILE__, 'event_name' );
+coderex_telemetry_track( __FILE__, 'event_name', $properties );
+```
+
+This helps understand what users were doing before they deactivated your plugin.
 
 ## What Data is Collected?
 

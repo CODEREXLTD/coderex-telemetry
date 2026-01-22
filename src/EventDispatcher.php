@@ -44,18 +44,27 @@ class EventDispatcher {
 	private $plugin_version;
 
 	/**
+	 * Plugin slug
+	 *
+	 * @var string
+	 */
+	private $plugin_slug;
+
+	/**
 	 * Constructor
 	 *
 	 * @param DriverInterface $driver Driver instance for sending events.
 	 * @param string          $plugin_name Plugin name.
 	 * @param string          $plugin_version Plugin version.
+	 * @param string          $plugin_slug Plugin slug.
 	 *
 	 * @since 1.0.0
 	 */
-	public function __construct( DriverInterface $driver, string $plugin_name, string $plugin_version ) {
+	public function __construct( DriverInterface $driver, string $plugin_name, string $plugin_version, string $plugin_slug = '' ) {
 		$this->driver         = $driver;
 		$this->plugin_name    = $plugin_name;
 		$this->plugin_version = $plugin_version;
+		$this->plugin_slug    = $plugin_slug;
 	}
 
 	/**
@@ -78,6 +87,38 @@ class EventDispatcher {
 		if ( ! $this->validatePayload( $payload ) ) {
 			return false;
 		}
+		// Send via driver
+		$result = $this->driver->send( $payload['event'], $payload['properties'] );
+
+		if ( ! $result ) {
+			$error = $this->driver->getLastError();
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Dispatch a lifecycle event (activation/deactivation)
+	 *
+	 * Lifecycle events are sent regardless of opt-in status to ensure
+	 * we capture plugin installation and removal events.
+	 *
+	 * @param string $event Event name.
+	 * @param array  $properties Event properties (optional).
+	 *
+	 * @return bool True on success, false on failure.
+	 * @since 1.0.0
+	 */
+	public function dispatchLifecycleEvent( string $event, array $properties = array() ): bool {
+		// Normalize the payload
+		$payload = $this->normalizePayload( $event, $properties );
+
+		// Validate the payload
+		if ( ! $this->validatePayload( $payload ) ) {
+			return false;
+		}
+
 		// Send via driver
 		$result = $this->driver->send( $payload['event'], $payload['properties'] );
 
