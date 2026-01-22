@@ -280,7 +280,8 @@ class Client {
     /**
      * Initialize lifecycle tracking
      *
-     * Sets up automatic tracking for plugin activation and deactivation events.
+     * Sets up automatic tracking for plugin activation and deactivation events
+     * using WordPress core hooks that fire when any plugin is activated/deactivated.
      *
      * @return void
      * @since 1.0.0
@@ -290,13 +291,46 @@ class Client {
             return;
         }
 
-        // Register activation hook
-        register_activation_hook( $this->pluginFile, array( $this, 'handlePluginActivation' ) );
-
-        // Register deactivation hook
-        register_deactivation_hook( $this->pluginFile, array( $this, 'handlePluginDeactivation' ) );
+        // Hook into WordPress core plugin activation/deactivation actions
+        // These fire after the plugin's activation/deactivation hooks
+        add_action( 'activated_plugin', array( $this, 'onPluginActivated' ), 10, 2 );
+        add_action( 'deactivated_plugin', array( $this, 'onPluginDeactivated' ), 10, 2 );
 
         $this->lifecycleTrackingInitialized = true;
+    }
+
+    /**
+     * Handle WordPress activated_plugin hook
+     *
+     * Called when any plugin is activated. Checks if it's this plugin.
+     *
+     * @param string $plugin Path to the plugin file relative to the plugins directory.
+     * @param bool   $network_wide Whether to enable the plugin for all sites in the network.
+     * @return void
+     * @since 1.0.0
+     */
+    public function onPluginActivated( $plugin, $network_wide = false ): void {
+        // Check if the activated plugin matches this client's plugin
+        if ( plugin_basename( $this->pluginFile ) === $plugin ) {
+            $this->handlePluginActivation();
+        }
+    }
+
+    /**
+     * Handle WordPress deactivated_plugin hook
+     *
+     * Called when any plugin is deactivated. Checks if it's this plugin.
+     *
+     * @param string $plugin Path to the plugin file relative to the plugins directory.
+     * @param bool   $network_wide Whether to enable the plugin for all sites in the network.
+     * @return void
+     * @since 1.0.0
+     */
+    public function onPluginDeactivated( $plugin, $network_wide = false ): void {
+        // Check if the deactivated plugin matches this client's plugin
+        if ( plugin_basename( $this->pluginFile ) === $plugin ) {
+            $this->handlePluginDeactivation();
+        }
     }
 
     /**
