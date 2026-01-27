@@ -99,38 +99,6 @@ class EventDispatcher {
 	}
 
 	/**
-	 * Dispatch a lifecycle event (activation/deactivation)
-	 *
-	 * Lifecycle events are sent regardless of opt-in status to ensure
-	 * we capture plugin installation and removal events.
-	 *
-	 * @param string $event Event name.
-	 * @param array  $properties Event properties (optional).
-	 *
-	 * @return bool True on success, false on failure.
-	 * @since 1.0.0
-	 */
-	public function dispatchLifecycleEvent( string $event, array $properties = array() ): bool {
-		// Normalize the payload
-		$payload = $this->normalizePayload( $event, $properties );
-
-		// Validate the payload
-		if ( ! $this->validatePayload( $payload ) ) {
-			return false;
-		}
-
-		// Send via driver
-		$result = $this->driver->send( $payload['event'], $payload['properties'] );
-
-		if ( ! $result ) {
-			$error = $this->driver->getLastError();
-			return false;
-		}
-
-		return true;
-	}
-
-	/**
 	 * Normalize payload to create consistent event structure
 	 *
 	 * Creates a standardized structure with event and properties keys,

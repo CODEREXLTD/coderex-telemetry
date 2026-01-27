@@ -125,9 +125,6 @@ class Client {
 
         // Store instance in global variable with plugin-specific name
         $this->storeGlobalInstance();
-
-        // Initialize lifecycle tracking
-        $this->initLifecycleTracking();
     }
 
 
@@ -275,114 +272,6 @@ class Client {
         $safe_slug = str_replace( '-', '_', $slug );
         $global_name = $safe_slug . '_telemetry_client';
         return $GLOBALS[ $global_name ] ?? null;
-    }
-
-    /**
-     * Initialize lifecycle tracking
-     *
-     * Sets up automatic tracking for plugin activation and deactivation events
-     * using WordPress core hooks that fire when any plugin is activated/deactivated.
-     *
-     * @return void
-     * @since 1.0.0
-     */
-    private function initLifecycleTracking(): void {
-        if ( $this->lifecycleTrackingInitialized ) {
-            return;
-        }
-
-        // Hook into WordPress core plugin activation/deactivation actions
-        // These fire after the plugin's activation/deactivation hooks
-        add_action( 'activated_plugin', array( $this, 'onPluginActivated' ), 10, 2 );
-        add_action( 'deactivated_plugin', array( $this, 'onPluginDeactivated' ), 10, 2 );
-
-        $this->lifecycleTrackingInitialized = true;
-    }
-
-    /**
-     * Handle WordPress activated_plugin hook
-     *
-     * Called when any plugin is activated. Checks if it's this plugin.
-     *
-     * @param string $plugin Path to the plugin file relative to the plugins directory.
-     * @param bool   $network_wide Whether to enable the plugin for all sites in the network.
-     * @return void
-     * @since 1.0.0
-     */
-    public function onPluginActivated( $plugin, $network_wide = false ): void {
-        // Check if the activated plugin matches this client's plugin
-        if ( plugin_basename( $this->pluginFile ) === $plugin ) {
-            $this->handlePluginActivation();
-        }
-    }
-
-    /**
-     * Handle WordPress deactivated_plugin hook
-     *
-     * Called when any plugin is deactivated. Checks if it's this plugin.
-     *
-     * @param string $plugin Path to the plugin file relative to the plugins directory.
-     * @param bool   $network_wide Whether to enable the plugin for all sites in the network.
-     * @return void
-     * @since 1.0.0
-     */
-    public function onPluginDeactivated( $plugin, $network_wide = false ): void {
-        // Check if the deactivated plugin matches this client's plugin
-        if ( plugin_basename( $this->pluginFile ) === $plugin ) {
-            $this->handlePluginDeactivation();
-        }
-    }
-
-    /**
-     * Handle plugin activation event
-     *
-     * Automatically triggered when the plugin is activated.
-     * Tracks the activation event with site_url.
-     *
-     * @return void
-     * @since 1.0.0
-     */
-    public function handlePluginActivation(): void {
-        // Store activation time
-        $activation_time = time();
-        update_option( $this->slug . '_activated_time', $activation_time, false );
-
-        // Track activation event (bypass opt-in check for lifecycle events)
-        $this->dispatcher->dispatchLifecycleEvent( 'plugin_activated', array(
-            'site_url' => Utils::getSiteUrl(),
-            'activation_time' => gmdate( 'c', $activation_time ),
-        ) );
-    }
-
-    /**
-     * Handle plugin deactivation event
-     *
-     * Automatically triggered when the plugin is deactivated.
-     * Tracks the deactivation event with usage_duration and last_core_action.
-     *
-     * @return void
-     * @since 1.0.0
-     */
-    public function handlePluginDeactivation(): void {
-        // Calculate usage duration
-        $activation_time = get_option( $this->slug . '_activated_time', 0 );
-        $usage_duration = 0;
-        if ( $activation_time > 0 ) {
-            $usage_duration = time() - $activation_time;
-        }
-
-        // Get last core action
-        $last_core_action = get_option( $this->slug . '_last_core_action', '' );
-
-        // Track deactivation event (bypass opt-in check for lifecycle events)
-        $this->dispatcher->dispatchLifecycleEvent( 'plugin_deactivated', array(
-            'usage_duration' => $usage_duration,
-            'last_core_action' => $last_core_action,
-            'deactivation_time' => gmdate( 'c' ),
-        ) );
-
-        // Clean up activation time option
-        delete_option( $this->slug . '_activated_time' );
     }
 
     /**
