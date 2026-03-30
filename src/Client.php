@@ -11,6 +11,7 @@
 
 namespace Linno\Telemetry;
 
+use Linno\Telemetry\Drivers\DriverInterface;
 use Linno\Telemetry\Drivers\OpenPanelDriver;
 use Linno\Telemetry\Helpers\Utils;
 use InvalidArgumentException;
@@ -113,15 +114,27 @@ class Client {
      *
      * Initializes the telemetry client with API key, plugin name, and plugin file path.
      *
-     * @param string $apiKey API key for OpenPanel authentication.
-     * @param string $apiSecret API secret for OpenPanel authentication.
-     * @param string $pluginName Human-readable plugin name.
-     * @param string $pluginFile Path to the main plugin file.
+     * Accepts an optional driver instance for dependency injection. When no driver
+     * is supplied the default OpenPanelDriver is created automatically using the
+     * provided API key and secret, so existing integrations require no changes.
+     *
+     * To use a different driver (e.g. PostHog), create and configure it first,
+     * then pass it as the fifth argument:
+     *
+     *   $driver = new \Linno\Telemetry\Drivers\PostHogDriver();
+     *   $driver->setApiKey( 'phc_xxxx' );
+     *   $client = new Client( 'phc_xxxx', '', 'My Plugin', __FILE__, $driver );
+     *
+     * @param string               $apiKey     API key (used by the default OpenPanelDriver or passed to a custom driver manually).
+     * @param string               $apiSecret  API secret (used by OpenPanelDriver; pass empty string for drivers that do not need it).
+     * @param string               $pluginName Human-readable plugin name.
+     * @param string               $pluginFile Path to the main plugin file.
+     * @param DriverInterface|null $driver     Optional pre-configured driver. Defaults to OpenPanelDriver.
      *
      * @throws InvalidArgumentException If API key is empty.
      * @since 1.0.0
      */
-    public function __construct( string $apiKey, string $apiSecret, string $pluginName, string $pluginFile ) {
+    public function __construct( string $apiKey, string $apiSecret, string $pluginName, string $pluginFile, ?DriverInterface $driver = null ) {
         // Validate API key
         if ( empty( $apiKey ) ) {
             throw new InvalidArgumentException( 'API key cannot be empty' );
@@ -141,10 +154,12 @@ class Client {
             self::$textDomain = $this->config['slug'];
         }
 
-        // Initialize OpenPanelDriver
-        $driver = new OpenPanelDriver();
-        $driver->setApiKey( $apiKey );
-        $driver->setApiSecret( $apiSecret );
+        // Use the injected driver, or fall back to OpenPanelDriver.
+        if ( null === $driver ) {
+            $driver = new OpenPanelDriver();
+            $driver->setApiKey( $apiKey );
+            $driver->setApiSecret( $apiSecret );
+        }
 
         // Initialize EventDispatcher
         $this->handlers['dispatcher'] = new EventDispatcher( $driver, $pluginName, $this->config['pluginVersion'], $this->config['unique_id'] );
@@ -616,16 +631,7 @@ class Client {
             return;
         }
 
-        $this->track( 'setup', $properties );
-        $this->mark_event_sent( 'setup' );
-    }
-
-    /**
-     * Track a 'first_strike' event.
-     *
-     * This event is sent only once when the user experiences the core value of the product.
-     * Requires user consent.
-     *
+		$this->track_immediate( 'setup', $properties );
      * @param array $properties Additional properties for the event.
      * @return void
      */
