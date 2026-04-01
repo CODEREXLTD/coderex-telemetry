@@ -20,7 +20,7 @@ The SDK's core purpose is to handle data transmission securely and ethically. De
 -   **Easy Integration**: Simple config-array constructor — only `pluginFile` and `slug` are required.
 -   **Canonical Event Taxonomy**: Library-owned events are emitted under a stable `activation/*` namespace.
 -   **Lifecycle Events**: Tracks plugin activation and deactivation via the standard WordPress hook system.
--   **Optional PLG Triggers**: Define `setup`, `first_strike` / `onboarding`, and `aha` / `kui` triggers only when needed — omitting them leaves those modules disabled by default.
+-   **Optional PLG Triggers**: Define `setup` / `onboarding`, and `aha` / `kui` triggers only when needed — omitting them leaves those modules disabled by default.
 -   **Custom Events**: Send arbitrary events with any name and optional properties through a PHP API _or_ a WordPress action hook.
 -   **Non-Fatal Telemetry**: Missing drivers and send failures are logged and silently dropped — they never interrupt plugin execution.
 -   **Multi-Driver Support**: Works with PostHog and OpenPanel; falls back to a safe NullDriver when no driver is configured.
@@ -112,8 +112,12 @@ $telemetry_client->define_triggers([
     // Fires activation/onboarding_completed once — use 'setup' or 'onboarding'
     'setup' => 'my_plugin_setup_complete',
 
-    // Also fires activation/onboarding_completed once
-    'first_strike' => 'my_plugin_first_funnel_created',
+    // Fires retention/feature_used for each defined feature
+    'feature_used' => [
+        'funnel_created' => [
+            'hook' => 'my_plugin_funnel_created',
+        ],
+    ],
 
     // Fires activation/aha_reached — use 'aha' (canonical) or 'kui' (legacy alias)
     'aha' => [
@@ -181,7 +185,8 @@ The SDK emits all library-owned events under the `activation/*` namespace for a 
 |---|---|
 | Plugin activation | `activation/plugin_activated` |
 | Plugin deactivation | `activation/plugin_deactivated` |
-| Onboarding / setup / first_strike | `activation/onboarding_completed` |
+| Onboarding / setup | `activation/onboarding_completed` |
+| Feature Used | `retention/feature_used` |
 | AHA / KUI milestone | `activation/aha_reached` |
 
 Custom events submitted via `Client::track()` or the `<slug>_telemetry_track` WordPress action are passed through **unchanged** — the SDK never alters caller-supplied event names.
@@ -216,12 +221,40 @@ $telemetry_client->define_triggers([
 ]);
 ```
 
-### First Core-Value Moment (fires `activation/onboarding_completed` once)
+### Feature Used (fires `retention/feature_used`)
 
 ```php
 $telemetry_client->define_triggers([
-    'first_strike' => 'my_plugin_first_funnel_created',
+    'feature_used' => [
+        'funnel_created' => [
+            'hook' => 'my_plugin_funnel_created',
+            'callback'  => function( $funnel_id ) {
+                return ['funnel_id' => $funnel_id];
+            },
+        ],
+    ],
 ]);
+```
+
+Alternatively, use the static convenience method to register a feature-used event from anywhere in your codebase after the client is initialized:
+
+```php
+use Linno\Telemetry\Client;
+
+// Fires retention/feature_used with feature='Export Settings' when the hook is triggered.
+Client::add_feature_used_event( 'my_plugin_settings_exported', 'Export Settings' );
+
+// With optional extra parameters.
+Client::add_feature_used_event( 'my_plugin_settings_imported', 'Import Settings', [ 'source' => 'file' ] );
+```
+
+Then trigger the corresponding WordPress action in your plugin code:
+
+```php
+function my_plugin_export_settings() {
+    // ... export logic ...
+    do_action( 'my_plugin_settings_exported' );
+}
 ```
 
 ### AHA / KUI Milestones (fires `activation/aha_reached`)

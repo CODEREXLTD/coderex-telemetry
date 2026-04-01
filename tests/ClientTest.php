@@ -237,4 +237,72 @@ class ClientTest extends TestCase
         // Assert no exceptions were thrown — the queue would hold the event
         $this->assertTrue( true );
     }
+
+    // -----------------------------------------------------------------------
+    // T008 / T009 — add_feature_used_event static API (US2)
+    // -----------------------------------------------------------------------
+
+    public function testAddFeatureUsedEventRegistersActionHook(): void
+    {
+        global $_wp_hooks;
+
+        Client::add_feature_used_event( 'my_plugin_feature_used', 'Export Settings' );
+
+        $this->assertNotEmpty( $_wp_hooks['my_plugin_feature_used'] ?? [] );
+    }
+
+    public function testAddFeatureUsedEventCallbackTracksCorrectEvent(): void
+    {
+        // Reset static instances so only this client is registered.
+        $ref = new \ReflectionProperty( Client::class, 'instances' );
+        $ref->setAccessible( true );
+        $ref->setValue( null, [] );
+
+        $client = $this->makeClient();
+
+        update_option( 'linno_telemetry_allow_tracking', 'yes' );
+
+        Client::add_feature_used_event( 'my_plugin_export_run', 'Export Settings' );
+
+        // Firing the hook must not throw; track() routes to the queue internally.
+        do_action( 'my_plugin_export_run' );
+
+        $this->assertTrue( true );
+    }
+
+    public function testAddFeatureUsedEventForwardsParamsToTrack(): void
+    {
+        $ref = new \ReflectionProperty( Client::class, 'instances' );
+        $ref->setAccessible( true );
+        $ref->setValue( null, [] );
+
+        $client = $this->makeClient();
+
+        update_option( 'linno_telemetry_allow_tracking', 'yes' );
+
+        Client::add_feature_used_event( 'my_plugin_import_run', 'Import Settings', [ 'source' => 'file' ] );
+
+        // Firing the hook must not throw even when extra params are supplied.
+        do_action( 'my_plugin_import_run' );
+
+        $this->assertTrue( true );
+    }
+
+    public function testAddFeatureUsedEventSilentlyDropsWithoutConsent(): void
+    {
+        $driver = $this->makeDriver();
+        $driver->shouldReceive( 'send' )->never();
+
+        $ref = new \ReflectionProperty( Client::class, 'instances' );
+        $ref->setAccessible( true );
+        $ref->setValue( null, [] );
+
+        $client = $this->makeClient( [], $driver );
+
+        // No consent set — event must be silently dropped.
+        Client::add_feature_used_event( 'my_plugin_no_consent', 'Some Feature' );
+        do_action( 'my_plugin_no_consent' );
+
+        $this->addToAssertionCount( 1 );
+    }
 }

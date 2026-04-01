@@ -1,8 +1,9 @@
 # coderex-telemetry Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-04-01
+Auto-generated from all feature plans. Last updated: 2026-04-02
 
 ## Active Technologies
+- PHP >=7.4 + `posthog/posthog-php: ^2.1` (003-refactor-telemetry-events)
 
 - PHP >= 7.4 + WordPress runtime APIs, `posthog/posthog-php` ^2.1, Composer PSR-4 autoloading (002-refactor-telemetry-init)
 
@@ -22,6 +23,7 @@ tests/
 PHP >= 7.4: Follow standard conventions
 
 ## Recent Changes
+- 003-refactor-telemetry-events: Added PHP >=7.4 + `posthog/posthog-php: ^2.1`
 - 002-refactor-telemetry-init: Added PHP >= 7.4 + WordPress runtime APIs, `posthog/posthog-php` ^2.1, Composer PSR-4 autoloading
 
 <!-- MANUAL ADDITIONS START -->

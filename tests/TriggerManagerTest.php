@@ -105,23 +105,6 @@ class TriggerManagerTest extends TestCase
         $this->assertEquals( 'yes', get_option( 'my-plugin_event_sent_onboarding_completed' ) );
     }
 
-    public function testFirstStrikeTriggerEmitsCanonicalOnboardingEvent(): void
-    {
-        $driver = $this->makeDriver();
-        $client = $this->makeClient( [], $driver );
-
-        // Grant consent AFTER construction (constructor resets consent state via upgrade check)
-        update_option( 'linno_telemetry_allow_tracking', 'yes' );
-
-        $client->define_triggers( [
-            'first_strike' => 'my_plugin_first_value',
-        ] );
-
-        do_action( 'my_plugin_first_value' );
-
-        $this->assertEquals( 'yes', get_option( 'my-plugin_event_sent_onboarding_completed' ) );
-    }
-
     // -----------------------------------------------------------------------
     // T023 — KUI / AHA trigger emits activation/aha_reached (US3)
     // -----------------------------------------------------------------------

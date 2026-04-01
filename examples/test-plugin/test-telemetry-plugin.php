@@ -83,8 +83,12 @@ try {
         'setup' => 'my_plugin_setup_complete',
         // 'onboarding' => 'my_plugin_onboarding_finished',  // canonical alias
 
-        // First core-value moment: also fires activation/onboarding_completed once.
-        'first_strike' => 'my_plugin_first_funnel_created',
+        // Feature Used: fires retention/feature_used.
+        'feature_used' => [
+            'funnel_created' => [
+                'hook' => 'my_plugin_funnel_created',
+            ],
+        ],
 
         // AHA-milestone indicators (fire activation/aha_reached).
         // Both 'kui' (legacy) and 'aha' (canonical) are accepted.
@@ -151,15 +155,14 @@ add_action('publish_post', 'test_telemetry_track_post_published');
 // }
 // add_action('my_plugin_setup_complete', 'test_telemetry_track_setup_complete');
 
-// Example: Track first core-value moment (once, requires consent)
-// function test_telemetry_track_first_widget_added() {
-//     global $test_telemetry_client;
-//     if ($test_telemetry_client instanceof Client) {
-//         $test_telemetry_client->track_first_strike(['feature' => 'admin_widget']);
-//         // Emits: activation/onboarding_completed
-//     }
-// }
-// add_action('my_plugin_widget_added', 'test_telemetry_track_first_widget_added');
+// Example: Track feature usage via static convenience method (requires consent)
+// Call this after the client is initialized to register the event for a specific hook.
+Client::add_feature_used_event( 'my_plugin_settings_exported', 'Export Settings' );
+// When 'my_plugin_settings_exported' action fires, a retention/feature_used event
+// is sent with feature='Export Settings'.
+
+// With optional extra parameters:
+// Client::add_feature_used_event( 'my_plugin_settings_imported', 'Import Settings', [ 'source' => 'file' ] );
 
 // Example: Track AHA milestone (multiple times, requires consent)
 // function test_telemetry_track_order_received($order_id, $amount) {

@@ -3,7 +3,7 @@
  * Trigger Manager Class
  *
  * Handles automatic event tracking through configured triggers.
- * Supports setup, first_strike, and KUI events with threshold-based tracking.
+ * Supports setup and KUI events with threshold-based tracking.
  *
  * @package Linno\Telemetry
  * @since 1.0.0
@@ -71,25 +71,7 @@ class TriggerManager {
         return $this;
     }
 
-    /**
-     * Register first_strike trigger
-     *
-     * Fires once when the user experiences core value for the first time.
-     *
-     * @param string $hook WordPress action hook to listen to
-     * @param callable $callback Optional callback to generate properties
-     * @return self
-     */
-    public function on_first_strike( string $hook, ?callable $callback = null ): self {
-        $this->triggers['first_strike'] = [
-            'type'     => 'first_strike',
-            'hook'     => $hook,
-            'callback' => $callback,
-            'fired'    => false,
-        ];
 
-        return $this;
-    }
 
     /**
      * Register KUI (Key Usage Indicator) trigger
@@ -112,6 +94,27 @@ class TriggerManager {
             'threshold'  => $config['threshold'] ?? null,
             'callback'   => $config['callback'] ?? null,
             'check_callback' => $config['check_callback'] ?? null,
+        ];
+
+        return $this;
+    }
+
+    /**
+     * Register feature used trigger
+     *
+     * Fires every time the hook is triggered.
+     *
+     * @param string $feature_name Feature name to track
+     * @param string $hook WordPress action hook to listen to
+     * @param callable $callback Optional callback to generate properties
+     * @return self
+     */
+    public function on_feature_used( string $feature_name, string $hook, ?callable $callback = null ): self {
+        $this->triggers['feature_used_' . $feature_name] = [
+            'type'     => 'feature_used',
+            'feature'  => $feature_name,
+            'hook'     => $hook,
+            'callback' => $callback,
         ];
 
         return $this;
@@ -202,11 +205,12 @@ class TriggerManager {
             case 'setup':
                 $this->handle_setup( $key, $trigger, $args );
                 break;
-            case 'first_strike':
-                $this->handle_first_strike( $key, $trigger, $args );
-                break;
+
             case 'kui':
                 $this->handle_kui( $key, $trigger, $args );
+                break;
+            case 'feature_used':
+                $this->handle_feature_used( $key, $trigger, $args );
                 break;
             case 'custom':
                 $this->handle_custom( $key, $trigger, $args );
@@ -231,22 +235,7 @@ class TriggerManager {
         $this->client->track_setup( $properties ?: [] );
     }
 
-    /**
-     * Handle first_strike trigger
-     *
-     * @param string $key Trigger key
-     * @param array $trigger Trigger configuration
-     * @param array $args Hook arguments
-     * @return void
-     */
-    private function handle_first_strike( string $key, array $trigger, array $args ): void {
-        if ( $this->client->has_sent_event( 'onboarding_completed' ) ) {
-            return;
-        }
 
-        $properties = $this->execute_callback( $trigger['callback'], $args );
-        $this->client->track_first_strike( $properties ?: [] );
-    }
 
     /**
      * Handle KUI trigger
@@ -273,6 +262,19 @@ class TriggerManager {
             $properties = $this->execute_callback( $trigger['callback'], $args );
             $this->client->track_kui( $name, $properties ?: [] );
         }
+    }
+
+    /**
+     * Handle feature used trigger
+     *
+     * @param string $key Trigger key
+     * @param array $trigger Trigger configuration
+     * @param array $args Hook arguments
+     * @return void
+     */
+    private function handle_feature_used( string $key, array $trigger, array $args ): void {
+        $properties = $this->execute_callback( $trigger['callback'], $args );
+        $this->client->track_feature_used( $trigger['feature'], $properties ?: [] );
     }
 
     /**

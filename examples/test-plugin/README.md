@@ -89,6 +89,7 @@ The plugin demonstrates automatic event tracking:
 - **Install Event**: Sent automatically when user grants consent
 - **Weekly System Info**: Sent via WP-Cron (can be triggered manually)
 - **Deactivation Event**: Captured when plugin is deactivated
+- **Feature Used Event**: `Client::add_feature_used_event()` is used to register a `retention/feature_used` event triggered by a WordPress action hook
 
 ### Filter Demonstrations
 

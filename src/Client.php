@@ -98,6 +98,15 @@ class Client {
     private static string $consentServiceName = 'our analytics service';
 
     /**
+     * Registry of all active Client instances.
+     *
+     * Used by add_feature_used_event to dispatch events across all initialized clients.
+     *
+     * @var Client[]
+     */
+    private static array $instances = [];
+
+    /**
      * Handlers (dispatcher, consent, deactivation, queue)
      *
      * @var array
@@ -155,6 +164,8 @@ class Client {
             'deactivation' => new Deactivation( $this ),
             'queue'       => new Queue(),
         ];
+
+        self::$instances[] = $this;
 
         $this->init();
     }
@@ -696,30 +707,7 @@ class Client {
         $this->mark_event_sent( 'onboarding_completed' );
     }
 
-    /**
-     * Track a 'first_strike' event.
-     *
-     * This event is sent only once when the user experiences the core value of the product.
-     * Requires user consent.
-     *
-     * @param array $properties Additional properties for the event.
-     * @return void
-     */
-    public function track_first_strike( array $properties = [] ): void {
-        if ( $this->has_sent_event( 'onboarding_completed' ) ) {
-            return;
-        }
 
-        if ( ! $this->isOptInEnabled() ) {
-            return;
-        }
-
-        // Ensure onboarding_completed appears at least 1 second after activation in telemetry timelines.
-        $properties['__timestamp'] = gmdate( 'c', time() + 1 );
-
-        $this->track( 'activation/onboarding_completed', $properties );
-        $this->mark_event_sent( 'onboarding_completed' );
-    }
 
     /**
      * Track a 'kui' (Key Usage Indicator) event.
@@ -733,6 +721,41 @@ class Client {
      */
     public function track_kui( string $kui_name, array $properties = [] ): void {
         $this->track( 'activation/aha_reached', array_merge( [ 'indicator' => $kui_name ], $properties ) );
+    }
+
+    /**
+     * Track a 'feature_used' event.
+     *
+     * This event is sent when the user uses a core feature of the product.
+     * Requires user consent.
+     *
+     * @param string $feature_name The name of the feature.
+     * @param array $properties Additional properties for the event.
+     * @return void
+     */
+    public function track_feature_used( string $feature_name, array $properties = [] ): void {
+        $this->track( 'retention/feature_used', array_merge( [ 'feature' => $feature_name ], $properties ) );
+    }
+
+    /**
+     * Register a WordPress action hook that sends a retention/feature_used event when triggered.
+     *
+     * This static convenience method attaches a callback to the given WordPress
+     * action hook. When that hook fires, a `retention/feature_used` event is
+     * dispatched through every active Client instance initialized on the current
+     * request.
+     *
+     * @param string $hook_name    WordPress action hook to listen for.
+     * @param string $feature_name Name of the feature being tracked.
+     * @param array  $params       Optional key-value pairs sent with the event.
+     * @return void
+     */
+    public static function add_feature_used_event( string $hook_name, string $feature_name, array $params = [] ): void {
+        add_action( $hook_name, function() use ( $feature_name, $params ) {
+            foreach ( self::$instances as $instance ) {
+                $instance->track_feature_used( $feature_name, $params );
+            }
+        } );
     }
 
     /**
@@ -757,8 +780,8 @@ class Client {
      *
      * @param array $config Configuration array with:
      *                       - setup: hook name or ['hook' => hook_name, 'callback' => callable]
-     *                       - first_strike: hook name or ['hook' => hook_name, 'callback' => callable]
      *                       - kui: array of KUI configurations
+     *                       - feature_used: array of feature used configurations
      * @return self
      * @since 1.0.0
      */
@@ -779,12 +802,7 @@ class Client {
             $triggers->on_setup( $hook, $callback );
         }
 
-        // first_strike → fires activation/onboarding_completed (once)
-        if ( isset( $config['first_strike'] ) ) {
-            $hook = is_array( $config['first_strike'] ) ? $config['first_strike']['hook'] : $config['first_strike'];
-            $callback = is_array( $config['first_strike'] ) ? ( $config['first_strike']['callback'] ?? null ) : null;
-            $triggers->on_first_strike( $hook, $callback );
-        }
+
 
         // kui → fires activation/aha_reached for each defined indicator
         if ( isset( $config['kui'] ) && is_array( $config['kui'] ) ) {
@@ -800,6 +818,15 @@ class Client {
             foreach ( $config['aha'] as $name => $aha_config ) {
                 if ( is_array( $aha_config ) ) {
                     $triggers->on_kui( $name, $aha_config );
+                }
+            }
+        }
+
+        // feature_used → fires retention/feature_used for each defined feature
+        if ( isset( $config['feature_used'] ) && is_array( $config['feature_used'] ) ) {
+            foreach ( $config['feature_used'] as $name => $feature_config ) {
+                if ( is_array( $feature_config ) && isset($feature_config['hook'])) {
+                    $triggers->on_feature_used( $name, $feature_config['hook'], $feature_config['callback'] ?? null );
                 }
             }
         }
