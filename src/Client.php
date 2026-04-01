@@ -775,17 +775,17 @@ class Client {
     private function scheduleBackgroundReporting(): void {
         $hook = $this->get_cron_hook();
 
-        // Hook callback for weekly report
+        // Register the callback so it runs whenever WP-Cron fires this hook.
         add_action( $hook, array( $this, 'process_queue' ) );
 
-        // Schedule cron job if not already scheduled
-        if ( ! wp_next_scheduled( $hook ) ) {
-            // Apply filter for customizable interval (default: daily)
-            $interval = apply_filters( $this->config['slug'] . '_telemetry_report_interval', 'daily' );
-
-            // Schedule the event
-            wp_schedule_event( time(), $interval, $hook );
-        }
+        // Defer scheduling to the init hook so WordPress is fully loaded
+        // before we read or write the cron option.
+        add_action( 'init', function() use ( $hook ) {
+            if ( ! wp_next_scheduled( $hook ) ) {
+                $interval = apply_filters( $this->config['slug'] . '_telemetry_report_interval', 'daily' );
+                wp_schedule_event( time(), $interval, $hook );
+            }
+        } );
     }
 
     /**
