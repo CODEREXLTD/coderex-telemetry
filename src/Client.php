@@ -631,7 +631,7 @@ class Client {
             return;
         }
 
-        $this->track( 'setup', $properties );
+        $this->track_immediate( 'setup', $properties );
         $this->mark_event_sent( 'setup' );
     }
 
@@ -656,7 +656,7 @@ class Client {
         // Ensure first_strike appears at least 1 second after setup in telemetry timelines.
         $properties['__timestamp'] = gmdate( 'c', time() + 1 );
 
-        $this->track( 'first_strike', $properties );
+        $this->track_immediate( 'first_strike', $properties );
         $this->mark_event_sent( 'first_strike' );
     }
 
@@ -784,6 +784,21 @@ class Client {
             if ( ! wp_next_scheduled( $hook ) ) {
                 $interval = apply_filters( $this->config['slug'] . '_telemetry_report_interval', 'daily' );
                 wp_schedule_event( time(), $interval, $hook );
+            }
+        } );
+
+        // Flush any items already sitting in the queue immediately on shutdown
+        // so that events are never held longer than a single page load.
+        add_action( 'shutdown', function() {
+            if ( ! $this->isOptInEnabled() ) {
+                return;
+            }
+            if ( ! $this->handlers['queue']->table_exists() ) {
+                return;
+            }
+            $pending = $this->handlers['queue']->get_all( $this->config['slug'] );
+            if ( ! empty( $pending ) ) {
+                $this->process_queue();
             }
         } );
     }
