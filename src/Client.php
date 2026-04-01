@@ -631,7 +631,16 @@ class Client {
             return;
         }
 
-		$this->track_immediate( 'setup', $properties );
+        $this->track( 'setup', $properties );
+        $this->mark_event_sent( 'setup' );
+    }
+
+    /**
+     * Track a 'first_strike' event.
+     *
+     * This event is sent only once when the user experiences the core value of the product.
+     * Requires user consent.
+     *
      * @param array $properties Additional properties for the event.
      * @return void
      */
