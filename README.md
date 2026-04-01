@@ -284,6 +284,27 @@ The SDK supports migration from Appsero consent keys so existing users are not p
 
 If a legacy key exists with `yes` or `no` and `linno_telemetry_allow_tracking` is not set, the value is automatically reused and migrated to the Linno key.
 
+## Using the PostHog Driver
+
+To use the PostHog driver, you need to install the `posthog/posthog-php` package:
+
+```bash
+composer require posthog/posthog-php
+```
+
+Then, when you initialize the `Client`, specify the `posthog` driver and provide the host in the `driver_config`:
+
+```php
+$client = new Client([
+    'pluginFile' => __FILE__,
+    'slug' => 'my-awesome-plugin',
+    'driver' => 'posthog',
+    'driver_config' => [
+        'host' => 'https://app.posthog.com'
+    ]
+]);
+```
+
 ## License
 GPL-2.0-or-later
 

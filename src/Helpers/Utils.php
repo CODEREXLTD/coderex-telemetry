@@ -243,4 +243,15 @@ class Utils {
 
         return $identify;
     }
+
+    /**
+     * Get unique site ID
+     *
+     * @return string Unique site ID
+     * @since 1.0.0
+     */
+    public static function getUniqueSiteId(): string
+    {
+        return 'test-site-id';
+    }
 }

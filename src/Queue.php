@@ -12,9 +12,11 @@ class Queue {
     /**
      * Constructor
      */
-    public function __construct() {
-        global $wpdb;
-        $this->table_name = $wpdb->prefix . 'linno_telemetry_queue';
+    public function __construct($wpdb = null)
+    {
+        if ($wpdb) {
+            $this->table_name = $wpdb->prefix . 'linno_telemetry_queue';
+        }
     }
 
     /**

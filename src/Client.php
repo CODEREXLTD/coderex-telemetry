@@ -12,8 +12,10 @@
 namespace Linno\Telemetry;
 
 use Linno\Telemetry\Drivers\OpenPanelDriver;
+use Linno\Telemetry\Drivers\PostHogDriver;
 use Linno\Telemetry\Helpers\Utils;
 use InvalidArgumentException;
+use PostHog\PostHog;
 
 /**
  * Client class
@@ -121,43 +123,48 @@ class Client {
      * @throws InvalidArgumentException If API key is empty.
      * @since 1.0.0
      */
-    public function __construct( string $apiKey, string $apiSecret, string $pluginName, string $pluginFile ) {
-        // Validate API key
-        if ( empty( $apiKey ) ) {
-            throw new InvalidArgumentException( 'API key cannot be empty' );
+    public function __construct(array $config)
+    {
+        if (empty($config['pluginFile']) || empty($config['slug'])) {
+            throw new InvalidArgumentException('The "pluginFile" and "slug" parameters are required.');
         }
 
-        $this->config['apiKey']        = $apiKey;
-        $this->config['apiSecret']     = $apiSecret;
-        $this->config['pluginName']    = $pluginName;
-        $this->config['pluginFile']    = $pluginFile;
-        $this->config['pluginVersion'] = Utils::getPluginVersion( $pluginFile );
-        
-        $this->set_slug();
-        $this->config['unique_id']     = $this->get_or_create_unique_id();
+        $this->config = array_merge([
+            'apiKey' => '',
+            'apiSecret' => '',
+            'pluginName' => '',
+            'version' => '',
+            'unique_id' => '',
+            'driver' => 'open_panel',
+            'driver_config' => [],
+        ], $config);
 
-        // Default text domain if not already set
-        if ( empty( self::$textDomain ) ) {
-            self::$textDomain = $this->config['slug'];
+        self::$textDomain = $this->config['slug'];
+
+        $driver = null;
+        if ($this->config['driver'] === 'posthog') {
+            if (!class_exists(PostHog::class)) {
+                throw new \Exception('PostHog SDK not installed. Please run "composer require posthog/posthog-php".');
+            }
+            $driver = new PostHogDriver($this->config['driver_config']['host'] ?? '');
+        } else {
+            $driver = new OpenPanelDriver();
         }
 
-        // Initialize OpenPanelDriver
-        $driver = new OpenPanelDriver();
-        $driver->setApiKey( $apiKey );
-        $driver->setApiSecret( $apiSecret );
+        $this->handlers = [
+            'dispatcher' => new EventDispatcher($driver, $this->config),
+            'consent' => new Consent($this),
+            'deactivation' => new Deactivation($this),
+            'queue' => new Queue(),
+        ];
 
-        // Initialize EventDispatcher
-        $this->handlers['dispatcher'] = new EventDispatcher( $driver, $pluginName, $this->config['pluginVersion'], $this->config['unique_id'] );
-
-        // Initialize other handlers
-        $this->handlers['consent'] = new Consent( $this );
-        $this->handlers['deactivation'] = new Deactivation( $this );
-        $this->handlers['queue'] = new Queue();
-
-        // Schedule background reporting
-        $this->scheduleBackgroundReporting();
+        $this->init();
     }
 
+    public function getDispatcher(): EventDispatcher
+    {
+        return $this->handlers['dispatcher'];
+    }
     /**
      * Get the text domain.
      *

@@ -51,20 +51,29 @@ class EventDispatcher {
 	private $unique_id;
 
 	/**
+	 * Configuration data
+	 *
+	 * @var array
+	 */
+	private $config;
+
+	/**
 	 * Constructor
 	 *
 	 * @param DriverInterface $driver Driver instance for sending events.
-	 * @param string          $plugin_name Plugin name.
-	 * @param string          $plugin_version Plugin version.
-	 * @param string          $unique_id Unique identifier for the site.
+	 * @param array           $config Configuration data.
 	 *
 	 * @since 1.0.0
 	 */
-	public function __construct( DriverInterface $driver, string $plugin_name, string $plugin_version, string $unique_id ) {
-		$this->driver         = $driver;
-		$this->plugin_name    = $plugin_name;
-		$this->plugin_version = $plugin_version;
-		$this->unique_id      = $unique_id;
+	public function __construct(DriverInterface $driver, array $config)
+	{
+		$this->driver = $driver;
+		$this->config = $config;
+	}
+
+	public function getDriver(): DriverInterface
+	{
+		return $this->driver;
 	}
 
 	/**
