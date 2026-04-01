@@ -19,7 +19,7 @@ class PostHogDriver implements DriverInterface
     public function send(string $event, array $properties): bool
     {
         try {
-            PostHog::init($this->apiKey, $this->host);
+            PostHog::init($this->apiKey, ['host' => $this->host]);
 
             $identify = $properties['__identify'] ?? [];
             unset($properties['__identify']);
