@@ -11,11 +11,12 @@
 
 namespace Linno\Telemetry;
 
+use Linno\Telemetry\Drivers\DriverInterface;
+use Linno\Telemetry\Drivers\NullDriver;
 use Linno\Telemetry\Drivers\OpenPanelDriver;
 use Linno\Telemetry\Drivers\PostHogDriver;
 use Linno\Telemetry\Helpers\Utils;
 use InvalidArgumentException;
-use PostHog\PostHog;
 
 /**
  * Client class
@@ -130,32 +131,29 @@ class Client {
         }
 
         $this->config = array_merge([
-            'apiKey' => '',
-            'apiSecret' => '',
-            'pluginName' => '',
-            'version' => '',
-            'unique_id' => '',
-            'driver' => 'open_panel',
+            'apiKey'      => '',
+            'apiSecret'   => '',
+            'pluginName'  => '',
+            'version'     => '',
+            'unique_id'   => '',
+            'driver'      => '',
             'driver_config' => [],
         ], $config);
 
-        self::$textDomain = $this->config['slug'];
-
-        $driver = null;
-        if ($this->config['driver'] === 'posthog') {
-            if (!class_exists(PostHog::class)) {
-                throw new \Exception('PostHog SDK not installed. Please run "composer require posthog/posthog-php".');
-            }
-            $driver = new PostHogDriver($this->config['driver_config']['host'] ?? '');
-        } else {
-            $driver = new OpenPanelDriver();
+        // Normalize version key: accept both 'version' and 'pluginVersion'
+        if ( empty( $this->config['version'] ) && ! empty( $this->config['pluginVersion'] ) ) {
+            $this->config['version'] = $this->config['pluginVersion'];
         }
 
+        self::$textDomain = $this->config['slug'];
+
+        $driver = $this->resolve_driver();
+
         $this->handlers = [
-            'dispatcher' => new EventDispatcher($driver, $this->config),
-            'consent' => new Consent($this),
-            'deactivation' => new Deactivation($this),
-            'queue' => new Queue(),
+            'dispatcher'  => new EventDispatcher( $driver, $this->config ),
+            'consent'     => new Consent( $this ),
+            'deactivation' => new Deactivation( $this ),
+            'queue'       => new Queue(),
         ];
 
         $this->init();
@@ -165,6 +163,69 @@ class Client {
     {
         return $this->handlers['dispatcher'];
     }
+
+    /**
+     * Resolve the configured telemetry driver.
+     *
+     * Supports an injected test driver via config key '_test_driver' for unit tests.
+     * Falls back to NullDriver with a warning when the driver is missing or unrecognized.
+     *
+     * @return DriverInterface
+     */
+    private function resolve_driver(): DriverInterface
+    {
+        // Allow test injection without touching the real driver factories.
+        if ( ! empty( $this->config['_test_driver'] ) && $this->config['_test_driver'] instanceof DriverInterface ) {
+            return $this->config['_test_driver'];
+        }
+
+        $driver_type = strtolower( trim( $this->config['driver'] ?? '' ) );
+
+        if ( 'posthog' === $driver_type ) {
+            if ( ! class_exists( \PostHog\PostHog::class ) ) {
+                error_log( '[Linno Telemetry] Warning: PostHog SDK not found. Install posthog/posthog-php or switch to a supported driver. Falling back to NullDriver.' );
+                return new NullDriver();
+            }
+            $host   = $this->config['driver_config']['host'] ?? '';
+            $driver = new PostHogDriver( $host );
+            $driver->setApiKey( $this->config['driver_config']['api_key'] ?? $this->config['apiKey'] ?? '' );
+            return $driver;
+        }
+
+        if ( 'open_panel' === $driver_type ) {
+            $driver = new OpenPanelDriver();
+            $driver->setApiKey( $this->config['apiKey'] ?? '' );
+            if ( method_exists( $driver, 'setApiSecret' ) ) {
+                $driver->setApiSecret( $this->config['apiSecret'] ?? '' );
+            }
+            return $driver;
+        }
+
+        if ( '' !== $driver_type ) {
+            error_log( sprintf(
+                '[Linno Telemetry] Warning: Unrecognized driver "%s". Supported drivers: open_panel, posthog. Falling back to NullDriver.',
+                $driver_type
+            ) );
+        } else {
+            error_log( '[Linno Telemetry] Warning: No telemetry driver configured. Events will be silently dropped. Set the "driver" key to "open_panel" or "posthog" to enable tracking.' );
+        }
+
+        return new NullDriver();
+    }
+
+    /**
+     * WordPress action handler for the generic custom-event hook.
+     *
+     * Registered as: add_action( '<slug>_telemetry_track', ... )
+     *
+     * @param string $event_name  The event name.
+     * @param array  $properties  Optional associative properties array.
+     * @return void
+     */
+    public function handle_telemetry_action( string $event_name, array $properties = [] ): void {
+        $this->track( $event_name, $properties );
+    }
+
     /**
      * Get the text domain.
      *
@@ -238,7 +299,7 @@ class Client {
         if ( ! empty( self::$textDomain ) ) {
             load_plugin_textdomain( self::$textDomain, false, dirname( plugin_basename( $this->config['pluginFile'] ) ) . '/languages' );
         }
-        
+
         $this->handlers['consent']->init();
         $this->handlers['deactivation']->init();
         $this->init_triggers();
@@ -246,6 +307,14 @@ class Client {
         // Internally register activation and deactivation hooks
         register_activation_hook( $this->config['pluginFile'], [ $this, 'activate' ] );
         register_deactivation_hook( $this->config['pluginFile'], [ $this, 'deactivate' ] );
+
+        // Register the generic custom-event action hook: <slug>_telemetry_track
+        add_action(
+            $this->config['slug'] . '_telemetry_track',
+            [ $this, 'handle_telemetry_action' ],
+            10,
+            2
+        );
 
         // Ensure post-consent setup is completed for already-consented sites.
         if ( $this->isOptInEnabled() ) {
@@ -262,7 +331,7 @@ class Client {
         // Track activation without consent using minimal non-personal payload.
         if ( ! get_option( $this->config['slug'] . '_telemetry_activated_tracked' ) ) {
             $this->track_lifecycle_event(
-                'plugin_activated',
+                'activation/plugin_activated',
                 [
                     'site_url' => get_site_url(),
                 ]
@@ -297,7 +366,7 @@ class Client {
         if ( 'yes' !== get_transient( $transient_key ) ) {
             // Send a generic deactivation event if the feedback form didn't send one
             $this->track_lifecycle_event(
-                'plugin_deactivated',
+                'activation/plugin_deactivated',
                 [
                     'site_url' => get_site_url(),
                     'reason'   => 'none',
@@ -378,7 +447,7 @@ class Client {
         $properties['site_url']       = $properties['site_url'] ?? get_site_url();
         $properties['unique_id']      = $properties['unique_id'] ?? $this->config['unique_id'];
         $properties['plugin_name']    = $properties['plugin_name'] ?? $this->config['pluginName'];
-        $properties['plugin_version'] = $properties['plugin_version'] ?? $this->config['pluginVersion'];
+        $properties['plugin_version'] = $properties['plugin_version'] ?? $this->config['version'] ?? '';
         $properties['timestamp']      = $properties['timestamp'] ?? Utils::getCurrentTimestamp();
 
         // Add user identification context if not already present
@@ -410,7 +479,7 @@ class Client {
             ),
         );
 
-        if ( 'plugin_deactivated' === $event ) {
+        if ( 'activation/plugin_deactivated' === $event ) {
             $minimal_properties['reason'] = sanitize_text_field( (string) ( $properties['reason'] ?? 'none' ) );
         }
 
@@ -615,7 +684,7 @@ class Client {
      * @return void
      */
     public function track_setup( array $properties = [] ): void {
-        if ( $this->has_sent_event( 'setup' ) ) {
+        if ( $this->has_sent_event( 'onboarding_completed' ) ) {
             return;
         }
 
@@ -623,8 +692,8 @@ class Client {
             return;
         }
 
-        $this->track( 'setup', $properties );
-        $this->mark_event_sent( 'setup' );
+        $this->track( 'activation/onboarding_completed', $properties );
+        $this->mark_event_sent( 'onboarding_completed' );
     }
 
     /**
@@ -637,7 +706,7 @@ class Client {
      * @return void
      */
     public function track_first_strike( array $properties = [] ): void {
-        if ( $this->has_sent_event( 'first_strike' ) ) {
+        if ( $this->has_sent_event( 'onboarding_completed' ) ) {
             return;
         }
 
@@ -645,11 +714,11 @@ class Client {
             return;
         }
 
-        // Ensure first_strike appears at least 1 second after setup in telemetry timelines.
+        // Ensure onboarding_completed appears at least 1 second after activation in telemetry timelines.
         $properties['__timestamp'] = gmdate( 'c', time() + 1 );
 
-        $this->track( 'first_strike', $properties );
-        $this->mark_event_sent( 'first_strike' );
+        $this->track( 'activation/onboarding_completed', $properties );
+        $this->mark_event_sent( 'onboarding_completed' );
     }
 
     /**
@@ -663,7 +732,7 @@ class Client {
      * @return void
      */
     public function track_kui( string $kui_name, array $properties = [] ): void {
-        $this->track( 'kui_' . $kui_name, $properties );
+        $this->track( 'activation/aha_reached', array_merge( [ 'indicator' => $kui_name ], $properties ) );
     }
 
     /**
@@ -696,18 +765,28 @@ class Client {
     public function define_triggers( array $config ): self {
         $triggers = $this->triggers();
 
+        // setup → fires activation/onboarding_completed (once)
         if ( isset( $config['setup'] ) ) {
             $hook = is_array( $config['setup'] ) ? $config['setup']['hook'] : $config['setup'];
             $callback = is_array( $config['setup'] ) ? ( $config['setup']['callback'] ?? null ) : null;
             $triggers->on_setup( $hook, $callback );
         }
 
+        // onboarding → canonical alias for setup
+        if ( isset( $config['onboarding'] ) ) {
+            $hook = is_array( $config['onboarding'] ) ? $config['onboarding']['hook'] : $config['onboarding'];
+            $callback = is_array( $config['onboarding'] ) ? ( $config['onboarding']['callback'] ?? null ) : null;
+            $triggers->on_setup( $hook, $callback );
+        }
+
+        // first_strike → fires activation/onboarding_completed (once)
         if ( isset( $config['first_strike'] ) ) {
             $hook = is_array( $config['first_strike'] ) ? $config['first_strike']['hook'] : $config['first_strike'];
             $callback = is_array( $config['first_strike'] ) ? ( $config['first_strike']['callback'] ?? null ) : null;
             $triggers->on_first_strike( $hook, $callback );
         }
 
+        // kui → fires activation/aha_reached for each defined indicator
         if ( isset( $config['kui'] ) && is_array( $config['kui'] ) ) {
             foreach ( $config['kui'] as $name => $kui_config ) {
                 if ( is_array( $kui_config ) ) {
@@ -715,6 +794,18 @@ class Client {
                 }
             }
         }
+
+        // aha → canonical alias for kui
+        if ( isset( $config['aha'] ) && is_array( $config['aha'] ) ) {
+            foreach ( $config['aha'] as $name => $aha_config ) {
+                if ( is_array( $aha_config ) ) {
+                    $triggers->on_kui( $name, $aha_config );
+                }
+            }
+        }
+
+        // Register all newly-defined triggers so their WordPress hooks fire.
+        $triggers->init();
 
         return $this;
     }

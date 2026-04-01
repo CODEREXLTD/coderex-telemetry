@@ -46,69 +46,74 @@ use Linno\Telemetry\Client;
  */
 $test_telemetry_client = null;
 
-// Replace with your actual OpenPanel API key and secret
-$api_key = 'op_4d049e93ece5870c534a';
-$api_secret = 'sec_4d049e93ece5870c534a';
 $text_domain = 'test-telemetry-plugin';
 
 try {
     // Optional: Set text domain for i18n (defaults to plugin slug if not set)
     Client::set_text_domain( $text_domain );
 
-    // Initialize the telemetry client (only 4 arguments now)
-    $test_telemetry_client = new Client(
-        $api_key,
-        $api_secret,
-        'Test Telemetry Plugin',
-        __FILE__
-    );
-    
-    // Define automatic triggers for PLG events
-    // This is the new unified way - developers just define WHEN to track
+    // Initialize the telemetry client using a config array.
+    // Only 'pluginFile' and 'slug' are required.
+    // Set 'driver' to 'posthog' or 'open_panel'.  Omit it to run with no driver (events are silently dropped).
+    $test_telemetry_client = new Client([
+        'pluginFile'  => __FILE__,
+        'slug'        => 'test-telemetry-plugin',
+        'pluginName'  => 'Test Telemetry Plugin',
+        'version'     => '1.0.0',
+
+        // --- PostHog driver example ---
+        // 'driver'       => 'posthog',
+        // 'driver_config' => [
+        //     'host'    => 'https://app.posthog.com',
+        //     'api_key' => 'phc_YOUR_POSTHOG_API_KEY',
+        // ],
+
+        // --- OpenPanel driver example ---
+        'driver'     => 'open_panel',
+        'apiKey'     => 'op_YOUR_CLIENT_ID',
+        'apiSecret'  => 'sec_YOUR_API_SECRET',
+    ]);
+
+    // Define optional automatic triggers.
+    // Each key is optional — omitting a key simply disables that module.
     $test_telemetry_client->define_triggers([
-        // Setup: Fire when user completes setup wizard
-        // Developer fires: do_action('my_plugin_setup_complete')
+
+        // Onboarding completion: fires activation/onboarding_completed once.
+        // Both 'setup' (legacy) and 'onboarding' (canonical) are accepted.
         'setup' => 'my_plugin_setup_complete',
-        
-        // First Strike: Fire when user experiences core value for first time
-        // Developer fires: do_action('my_plugin_first_funnel_created')
+        // 'onboarding' => 'my_plugin_onboarding_finished',  // canonical alias
+
+        // First core-value moment: also fires activation/onboarding_completed once.
         'first_strike' => 'my_plugin_first_funnel_created',
-        
-        // KUI (Key Usage Indicators): Fire when user gets sufficient value
-        // Supports threshold-based tracking (e.g., 2 orders per week)
-        'kui' => [
+
+        // AHA-milestone indicators (fire activation/aha_reached).
+        // Both 'kui' (legacy) and 'aha' (canonical) are accepted.
+        'aha' => [
             'order_received' => [
-                'hook' => 'woocommerce_order_created',
+                'hook'      => 'woocommerce_order_created',
                 'threshold' => ['count' => 2, 'period' => 'week'],
-                'callback' => function( $order_id ) {
+                'callback'  => function( $order_id ) {
                     return ['order_id' => $order_id];
-                }
+                },
             ],
             'student_enrolled' => [
-                'hook' => 'lms_student_enrolled',
+                'hook'      => 'lms_student_enrolled',
                 'threshold' => ['count' => 2, 'period' => 'week'],
-                'callback' => function( $course_id, $student_id ) {
+                'callback'  => function( $course_id, $student_id ) {
                     return ['course_id' => $course_id, 'student_id' => $student_id];
-                }
+                },
             ],
-            // Simple KUI without threshold (fires every time)
-            'funnel_published' => [
-                'hook' => 'my_plugin_funnel_published'
-            ]
-        ]
+        ],
     ]);
-    
-    // Initialize all hooks for consent, deactivation, and triggers
-    // This now internally registers activation and deactivation hooks
-    $test_telemetry_client->init();
-    
+
 } catch (Exception $e) {
     error_log('Test Telemetry Plugin: Failed to initialize - ' . $e->getMessage());
 }
 
 /**
- * Track a custom event when a post is published
-
+ * Track a custom event when a post is published.
+ *
+ * Option A — direct PHP API call:
  *
  * @param int $post_id Post ID
  * @since 1.0.0
@@ -117,38 +122,51 @@ function test_telemetry_track_post_published($post_id) {
     global $test_telemetry_client;
     if ($test_telemetry_client instanceof Client) {
         $test_telemetry_client->track('post_published', [
-            'post_id' => $post_id,
+            'post_id'   => $post_id,
             'post_type' => get_post_type($post_id),
         ]);
     }
 }
 add_action('publish_post', 'test_telemetry_track_post_published');
 
-// --- Examples of PLG event tracking ---
+/**
+ * Option B — WordPress action hook:
+ * Any code in the plugin can fire this action to send a custom telemetry event:
+ *
+ *     do_action( 'test-telemetry-plugin_telemetry_track', 'post_published', ['post_id' => 42] );
+ *
+ * The client registers this handler automatically during initialization.
+ * No extra setup is required.
+ */
 
-// Example: Track 'setup' event (sent once, requires consent)
+// --- Examples of optional trigger-module tracking (commented out) ---
+
+// Example: Track onboarding completion (once, requires consent)
 // function test_telemetry_track_setup_complete() {
 //     global $test_telemetry_client;
 //     if ($test_telemetry_client instanceof Client) {
 //         $test_telemetry_client->track_setup(['setup_method' => 'quick_install']);
+//         // Emits: activation/onboarding_completed
 //     }
 // }
 // add_action('my_plugin_setup_complete', 'test_telemetry_track_setup_complete');
 
-// Example: Track 'first_strike' event (sent once, requires consent)
+// Example: Track first core-value moment (once, requires consent)
 // function test_telemetry_track_first_widget_added() {
 //     global $test_telemetry_client;
 //     if ($test_telemetry_client instanceof Client) {
 //         $test_telemetry_client->track_first_strike(['feature' => 'admin_widget']);
+//         // Emits: activation/onboarding_completed
 //     }
 // }
 // add_action('my_plugin_widget_added', 'test_telemetry_track_first_widget_added');
 
-// Example: Track 'kui' event (multiple times, requires consent)
+// Example: Track AHA milestone (multiple times, requires consent)
 // function test_telemetry_track_order_received($order_id, $amount) {
 //     global $test_telemetry_client;
 //     if ($test_telemetry_client instanceof Client) {
 //         $test_telemetry_client->track_kui('order_received', ['order_id' => $order_id, 'amount' => $amount]);
+//         // Emits: activation/aha_reached with indicator=order_received
 //     }
 // }
 // add_action('woocommerce_new_order', 'test_telemetry_track_order_received', 10, 2);

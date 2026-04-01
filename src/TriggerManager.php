@@ -60,7 +60,7 @@ class TriggerManager {
      * @param callable $callback Optional callback to generate properties
      * @return self
      */
-    public function on_setup( string $hook, callable $callback = null ): self {
+    public function on_setup( string $hook, ?callable $callback = null ): self {
         $this->triggers['setup'] = [
             'type'     => 'setup',
             'hook'     => $hook,
@@ -80,7 +80,7 @@ class TriggerManager {
      * @param callable $callback Optional callback to generate properties
      * @return self
      */
-    public function on_first_strike( string $hook, callable $callback = null ): self {
+    public function on_first_strike( string $hook, ?callable $callback = null ): self {
         $this->triggers['first_strike'] = [
             'type'     => 'first_strike',
             'hook'     => $hook,
@@ -127,7 +127,7 @@ class TriggerManager {
      * @param callable $callback Optional callback to generate properties
      * @return self
      */
-    public function on( string $event_name, string $hook, callable $callback = null ): self {
+    public function on( string $event_name, string $hook, ?callable $callback = null ): self {
         $this->triggers['custom_' . $event_name] = [
             'type'     => 'custom',
             'event'    => $event_name,
@@ -223,7 +223,7 @@ class TriggerManager {
      * @return void
      */
     private function handle_setup( string $key, array $trigger, array $args ): void {
-        if ( $this->client->has_sent_event( 'setup' ) ) {
+        if ( $this->client->has_sent_event( 'onboarding_completed' ) ) {
             return;
         }
 
@@ -240,7 +240,7 @@ class TriggerManager {
      * @return void
      */
     private function handle_first_strike( string $key, array $trigger, array $args ): void {
-        if ( $this->client->has_sent_event( 'first_strike' ) ) {
+        if ( $this->client->has_sent_event( 'onboarding_completed' ) ) {
             return;
         }
 
@@ -328,12 +328,12 @@ class TriggerManager {
                 $properties = $result;
             }
 
-            if ( $this->client->has_sent_event( 'kui_' . $name ) ) {
+            if ( $this->client->has_sent_event( 'aha_reached_' . $name ) ) {
                 return;
             }
 
             $this->client->track_kui( $name, $properties );
-            $this->client->mark_event_sent( 'kui_' . $name );
+            $this->client->mark_event_sent( 'aha_reached_' . $name );
         }
     }
 

@@ -14,9 +14,11 @@ class Queue {
      */
     public function __construct($wpdb = null)
     {
-        if ($wpdb) {
-            $this->table_name = $wpdb->prefix . 'linno_telemetry_queue';
+        if ( ! $wpdb ) {
+            global $wpdb;
         }
+        $prefix           = ( $wpdb && isset( $wpdb->prefix ) ) ? $wpdb->prefix : 'wp_';
+        $this->table_name = $prefix . 'linno_telemetry_queue';
     }
 
     /**
@@ -51,7 +53,9 @@ class Queue {
             INDEX plugin_slug_index (plugin_slug)
         ) $charset_collate;";
 
-        require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
+        if ( ! function_exists( 'dbDelta' ) ) {
+            require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
+        }
         dbDelta( $sql );
     }
 

@@ -67,8 +67,11 @@ class EventDispatcher {
 	 */
 	public function __construct(DriverInterface $driver, array $config)
 	{
-		$this->driver = $driver;
-		$this->config = $config;
+		$this->driver         = $driver;
+		$this->config         = $config;
+		$this->plugin_name    = $config['pluginName'] ?? '';
+		$this->plugin_version = $config['version'] ?? $config['pluginVersion'] ?? '';
+		$this->unique_id      = $config['unique_id'] ?? '';
 	}
 
 	public function getDriver(): DriverInterface
@@ -104,6 +107,11 @@ class EventDispatcher {
 
 		if ( ! $result ) {
 			$error = $this->driver->getLastError();
+			error_log( sprintf(
+				'[Linno Telemetry] Failed to send event "%s": %s',
+				$payload['event'],
+				$error ?? 'unknown error'
+			) );
 			return false;
 		}
 
@@ -134,6 +142,11 @@ class EventDispatcher {
 
 		if ( ! $result ) {
 			$error = $this->driver->getLastError();
+			error_log( sprintf(
+				'[Linno Telemetry] Failed to send event "%s": %s',
+				$sanitized_event,
+				$error ?? 'unknown error'
+			) );
 			return false;
 		}
 

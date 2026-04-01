@@ -93,7 +93,7 @@ class Utils {
      * @since 1.0.0
      */
     public static function sanitizeEventName( string $event ): string {
-        return preg_replace( '/[^a-zA-Z0-9_]/', '', $event );
+        return preg_replace( '/[^a-zA-Z0-9_\/]/', '', $event );
     }
 
     /**
