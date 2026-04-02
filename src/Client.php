@@ -154,6 +154,11 @@ class Client {
             $this->config['version'] = $this->config['pluginVersion'];
         }
 
+        // Ensure unique_id is populated
+        if ( empty( $this->config['unique_id'] ) ) {
+            $this->config['unique_id'] = $this->get_or_create_unique_id();
+        }
+
         self::$textDomain = $this->config['slug'];
 
         $driver = $this->resolve_driver();
