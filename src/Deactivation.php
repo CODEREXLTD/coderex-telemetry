@@ -379,7 +379,7 @@ class Deactivation {
         $reason = ! empty( $reason_info ) ? $reason_info : $reason_id;
 
         $this->client->track_lifecycle_event(
-            'plugin_deactivated',
+            'activation/plugin_deactivated',
             [
                 'site_url' => get_site_url(),
                 'reason'   => $reason,
