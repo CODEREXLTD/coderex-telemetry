@@ -252,6 +252,6 @@ class Utils {
      */
     public static function getUniqueSiteId(): string
     {
-        return 'test-site-id';
+        return md5( home_url() );
     }
 }

@@ -224,6 +224,12 @@ if ( ! function_exists( 'get_site_url' ) ) {
     }
 }
 
+if ( ! function_exists( 'home_url' ) ) {
+    function home_url( string $path = '', ?string $scheme = null ): string {
+        return 'https://example.com';
+    }
+}
+
 if ( ! function_exists( 'esc_url_raw' ) ) {
     function esc_url_raw( string $url, array $protocols = [] ): string {
         return $url;

@@ -388,6 +388,8 @@ class Client {
         delete_transient( $transient_key );
 
         $this->handlers['queue']->clear_for_plugin( $this->config['slug'] );
+
+        $this->unscheduleBackgroundReporting();
     }
 
 
@@ -958,6 +960,8 @@ class Client {
             $this->create_queue_table();
             update_option( self::GLOBAL_TABLE_CREATED_KEY, 'yes' );
         }
+
+        $this->scheduleBackgroundReporting();
     }
 
     /**
