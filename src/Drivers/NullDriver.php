@@ -5,11 +5,11 @@
  * Used when no telemetry driver is configured. All send operations silently
  * succeed without transmitting data, allowing the client to remain operational.
  *
- * @package Linno\Telemetry\Drivers
+ * @package LinnoSDK\Telemetry\Drivers
  * @since 1.0.0
  */
 
-namespace Linno\Telemetry\Drivers;
+namespace LinnoSDK\Telemetry\Drivers;
 
 /**
  * Class NullDriver

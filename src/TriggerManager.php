@@ -5,11 +5,11 @@
  * Handles automatic event tracking through configured triggers.
  * Supports setup and KUI events with threshold-based tracking.
  *
- * @package Linno\Telemetry
+ * @package LinnoSDK\Telemetry
  * @since 1.0.0
  */
 
-namespace Linno\Telemetry;
+namespace LinnoSDK\Telemetry;
 
 class TriggerManager {
     /**

@@ -1,8 +1,8 @@
 <?php
 
-namespace Linno\Telemetry\Tests\Drivers;
+namespace LinnoSDK\Telemetry\Tests\Drivers;
 
-use Linno\Telemetry\Drivers\PostHogDriver;
+use LinnoSDK\Telemetry\Drivers\PostHogDriver;
 use Mockery;
 use PostHog\PostHog;
 use PHPUnit\Framework\TestCase;

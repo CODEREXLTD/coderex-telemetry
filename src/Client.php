@@ -5,17 +5,17 @@
  * Main entry point for plugin developers to integrate telemetry tracking.
  * Handles initialization, configuration, and provides the public API for tracking events.
  *
- * @package Linno\Telemetry
+ * @package LinnoSDK\Telemetry
  * @since 1.0.0
  */
 
-namespace Linno\Telemetry;
+namespace LinnoSDK\Telemetry;
 
-use Linno\Telemetry\Drivers\DriverInterface;
-use Linno\Telemetry\Drivers\NullDriver;
-use Linno\Telemetry\Drivers\OpenPanelDriver;
-use Linno\Telemetry\Drivers\PostHogDriver;
-use Linno\Telemetry\Helpers\Utils;
+use LinnoSDK\Telemetry\Drivers\DriverInterface;
+use LinnoSDK\Telemetry\Drivers\NullDriver;
+use LinnoSDK\Telemetry\Drivers\OpenPanelDriver;
+use LinnoSDK\Telemetry\Drivers\PostHogDriver;
+use LinnoSDK\Telemetry\Helpers\Utils;
 use InvalidArgumentException;
 
 /**
@@ -224,7 +224,7 @@ class Client {
         }
 
         trigger_error(
-            'Passing positional parameters to Linno\Telemetry\Client::__construct() is deprecated. Use an array configuration instead. See https://github.com/user/coderex-telemetry#migration for details. This will be removed in the next major version.',
+            'Passing positional parameters to LinnoSDK\Telemetry\Client::__construct() is deprecated. Use an array configuration instead. See https://github.com/user/coderex-telemetry#migration for details. This will be removed in the next major version.',
             E_USER_DEPRECATED
         );
 

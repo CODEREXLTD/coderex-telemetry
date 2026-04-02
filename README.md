@@ -85,7 +85,7 @@ if (!defined('ABSPATH')) { exit; }
 
 require_once __DIR__ . '/vendor/autoload.php';
 
-use Linno\Telemetry\Client;
+use LinnoSDK\Telemetry\Client;
 
 // Optional display customizations
 Client::set_text_domain( 'my-awesome-plugin' );
@@ -239,7 +239,7 @@ $telemetry_client->define_triggers([
 Alternatively, use the static convenience method to register a feature-used event from anywhere in your codebase after the client is initialized:
 
 ```php
-use Linno\Telemetry\Client;
+use LinnoSDK\Telemetry\Client;
 
 // Fires retention/feature_used with feature='Export Settings' when the hook is triggered.
 Client::add_feature_used_event( 'my_plugin_settings_exported', 'Export Settings' );

@@ -1,10 +1,10 @@
 <?php
 
-namespace Linno\Telemetry\Tests;
+namespace LinnoSDK\Telemetry\Tests;
 
-use Linno\Telemetry\Client;
-use Linno\Telemetry\Drivers\DriverInterface;
-use Linno\Telemetry\Drivers\NullDriver;
+use LinnoSDK\Telemetry\Client;
+use LinnoSDK\Telemetry\Drivers\DriverInterface;
+use LinnoSDK\Telemetry\Drivers\NullDriver;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
@@ -108,7 +108,7 @@ class ClientTest extends TestCase
             'apiSecret'     => 'op_test_secret',
         ] );
         $dispatcher = $client->getDispatcher();
-        $this->assertInstanceOf( \Linno\Telemetry\Drivers\OpenPanelDriver::class, $dispatcher->getDriver() );
+        $this->assertInstanceOf( \LinnoSDK\Telemetry\Drivers\OpenPanelDriver::class, $dispatcher->getDriver() );
     }
 
     // -----------------------------------------------------------------------

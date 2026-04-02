@@ -2,11 +2,11 @@
 /**
  * OpenPanel Driver Implementation
  *
- * @package Linno\Telemetry
+ * @package LinnoSDK\Telemetry
  * @since 1.0.0
  */
 
-namespace Linno\Telemetry\Drivers;
+namespace LinnoSDK\Telemetry\Drivers;
 
 /**
  * Class OpenPanelDriver

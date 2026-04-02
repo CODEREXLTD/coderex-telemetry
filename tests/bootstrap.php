@@ -3,7 +3,7 @@
  * PHPUnit bootstrap — WordPress function stubs for library-level tests.
  *
  * Provides minimal no-op implementations of WordPress functions so the
- * Linno\Telemetry classes can be exercised without a full WordPress runtime.
+ * LinnoSDK\Telemetry classes can be exercised without a full WordPress runtime.
  */
 
 require_once __DIR__ . '/../vendor/autoload.php';

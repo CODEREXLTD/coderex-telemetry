@@ -1,10 +1,10 @@
 <?php
 
-namespace Linno\Telemetry\Tests;
+namespace LinnoSDK\Telemetry\Tests;
 
-use Linno\Telemetry\Client;
-use Linno\Telemetry\TriggerManager;
-use Linno\Telemetry\Drivers\DriverInterface;
+use LinnoSDK\Telemetry\Client;
+use LinnoSDK\Telemetry\TriggerManager;
+use LinnoSDK\Telemetry\Drivers\DriverInterface;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 

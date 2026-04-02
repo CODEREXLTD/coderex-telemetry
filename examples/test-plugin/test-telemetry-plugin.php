@@ -37,7 +37,7 @@ else {
     return;
 }
 
-use Linno\Telemetry\Client;
+use LinnoSDK\Telemetry\Client;
 
 /**
  * Global telemetry client instance.
@@ -363,7 +363,7 @@ function test_telemetry_admin_page() {
             <p><strong>Plugin File:</strong> <?php echo esc_html(__FILE__); ?></p>
             <p><strong>Plugin Folder:</strong> test-telemetry-plugin</p>
             <p><strong>Plugin Version:</strong> 1.0.0</p>
-            <p><strong>SDK Loaded:</strong> <?php echo class_exists('Linno\Telemetry\Client') ? '✓ Yes' : '✗ No'; ?></p>
+            <p><strong>SDK Loaded:</strong> <?php echo class_exists('LinnoSDK\Telemetry\Client') ? '✓ Yes' : '✗ No'; ?></p>
             <?php 
             if ($test_telemetry_client instanceof Client): ?>
                 <p style="color: green;"><strong>✓ Telemetry Client Initialized</strong></p>

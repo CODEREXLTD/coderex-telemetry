@@ -2,7 +2,7 @@
 /**
  * Global helper functions for Linno Telemetry SDK
  *
- * @package Linno\Telemetry
+ * @package LinnoSDK\Telemetry
  * @since 1.0.0
  */
 
@@ -14,11 +14,11 @@ if (!function_exists('linno_telemetry')) {
      * The Client must be initialized elsewhere in the plugin before calling this function.
      *
      * @param string $plugin_file The main plugin file path (use __FILE__ from your main plugin file)
-    * @return \Linno\Telemetry\Client|null The Client instance or null if not initialized
+    * @return \LinnoSDK\Telemetry\Client|null The Client instance or null if not initialized
      * @since 1.0.0
      */
     function linno_telemetry(string $plugin_file) {
-        return \Linno\Telemetry\Client::getInstance($plugin_file);
+        return \LinnoSDK\Telemetry\Client::getInstance($plugin_file);
     }
 }
 
@@ -59,7 +59,7 @@ if (!function_exists('linno_telemetry_generate_profile_id')) {
      * @since 1.0.0
      */
     function linno_telemetry_generate_profile_id(): string {
-        return \Linno\Telemetry\Helpers\Utils::generateProfileId();
+        return \LinnoSDK\Telemetry\Helpers\Utils::generateProfileId();
     }
 }
 

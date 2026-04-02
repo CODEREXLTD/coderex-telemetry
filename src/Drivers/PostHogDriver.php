@@ -1,8 +1,8 @@
 <?php
 
-namespace Linno\Telemetry\Drivers;
+namespace LinnoSDK\Telemetry\Drivers;
 
-use Linno\Telemetry\Helpers\Utils;
+use LinnoSDK\Telemetry\Helpers\Utils;
 use PostHog\PostHog;
 
 class PostHogDriver implements DriverInterface

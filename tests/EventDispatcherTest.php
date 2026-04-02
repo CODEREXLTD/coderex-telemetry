@@ -1,9 +1,9 @@
 <?php
 
-namespace Linno\Telemetry\Tests;
+namespace LinnoSDK\Telemetry\Tests;
 
-use Linno\Telemetry\EventDispatcher;
-use Linno\Telemetry\Drivers\DriverInterface;
+use LinnoSDK\Telemetry\EventDispatcher;
+use LinnoSDK\Telemetry\Drivers\DriverInterface;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 

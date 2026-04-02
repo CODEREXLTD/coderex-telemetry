@@ -5,11 +5,11 @@
  * Provides utility functions for gathering system information,
  * sanitizing data, and other helper operations.
  *
- * @package Linno\Telemetry
+ * @package LinnoSDK\Telemetry
  * @since 1.0.0
  */
 
-namespace Linno\Telemetry\Helpers;
+namespace LinnoSDK\Telemetry\Helpers;
 
 /**
  * Utils class

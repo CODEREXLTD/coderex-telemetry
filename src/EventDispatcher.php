@@ -5,14 +5,14 @@
  * Orchestrates event sending by normalizing payloads, adding system information,
  * validating data, and delegating transmission to the appropriate driver.
  *
- * @package Linno\Telemetry
+ * @package LinnoSDK\Telemetry
  * @since 1.0.0
  */
 
-namespace Linno\Telemetry;
+namespace LinnoSDK\Telemetry;
 
-use Linno\Telemetry\Drivers\DriverInterface;
-use Linno\Telemetry\Helpers\Utils;
+use LinnoSDK\Telemetry\Drivers\DriverInterface;
+use LinnoSDK\Telemetry\Helpers\Utils;
 
 /**
  * EventDispatcher class
