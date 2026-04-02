@@ -123,20 +123,35 @@ class Client {
     /**
      * Constructor
      *
-     * Initializes the telemetry client with API key, plugin name, and plugin file path.
+     * Accepts either an array configuration or the legacy 4-positional-parameter signature.
      *
-     * @param string $apiKey API key for OpenPanel authentication.
-     * @param string $apiSecret API secret for OpenPanel authentication.
-     * @param string $pluginName Human-readable plugin name.
-     * @param string $pluginFile Path to the main plugin file.
+     * Array form (current):
+     *   new Client(['pluginFile' => ..., 'slug' => ..., ...])
      *
-     * @throws InvalidArgumentException If API key is empty.
+     * Legacy positional form (deprecated):
+     *   new Client($apiKey, $apiSecret, $pluginName, $pluginFile)
+     *
+     * @param array|string $configOrApiKey Configuration array, or API key string for legacy form.
+     * @param string       $apiSecret      (Legacy) API secret.
+     * @param string       $pluginName     (Legacy) Human-readable plugin name.
+     * @param string       $pluginFile     (Legacy) Path to the main plugin file.
+     *
+     * @throws InvalidArgumentException If the first argument is not an array or string, or if
+     *                                  required fields are missing.
      * @since 1.0.0
      */
-    public function __construct(array $config)
+    public function __construct($configOrApiKey, string $apiSecret = '', string $pluginName = '', string $pluginFile = '')
     {
-        if (empty($config['pluginFile']) || empty($config['slug'])) {
-            throw new InvalidArgumentException('The "pluginFile" and "slug" parameters are required.');
+        if ( is_array( $configOrApiKey ) ) {
+            $config = $configOrApiKey;
+
+            if (empty($config['pluginFile']) || empty($config['slug'])) {
+                throw new InvalidArgumentException('The "pluginFile" and "slug" parameters are required.');
+            }
+        } elseif ( is_string( $configOrApiKey ) ) {
+            $config = $this->buildLegacyConfig( $configOrApiKey, $apiSecret, $pluginName, $pluginFile );
+        } else {
+            throw new InvalidArgumentException( 'First argument must be a configuration array or a string API key' );
         }
 
         $this->config = array_merge([
@@ -178,6 +193,59 @@ class Client {
     public function getDispatcher(): EventDispatcher
     {
         return $this->handlers['dispatcher'];
+    }
+
+    /**
+     * Build a config array from legacy 4-positional-parameter constructor arguments.
+     *
+     * @param string $apiKey      API key.
+     * @param string $apiSecret   API secret.
+     * @param string $pluginName  Human-readable plugin name.
+     * @param string $pluginFile  Path to the main plugin file.
+     * @return array
+     * @throws InvalidArgumentException If any required parameter is missing or empty.
+     */
+    private function buildLegacyConfig( string $apiKey, string $apiSecret, string $pluginName, string $pluginFile ): array
+    {
+        if ( '' === $apiSecret && '' === $pluginName && '' === $pluginFile ) {
+            throw new InvalidArgumentException( 'Legacy constructor requires exactly 4 string parameters' );
+        }
+
+        if ( '' === $apiKey ) {
+            throw new InvalidArgumentException( 'API key must not be empty' );
+        }
+
+        if ( '' === $pluginFile ) {
+            throw new InvalidArgumentException( 'Plugin file path must not be empty' );
+        }
+
+        if ( '' === $pluginName ) {
+            throw new InvalidArgumentException( 'Plugin name must not be empty' );
+        }
+
+        trigger_error(
+            'Passing positional parameters to Linno\Telemetry\Client::__construct() is deprecated. Use an array configuration instead. See https://github.com/user/coderex-telemetry#migration for details. This will be removed in the next major version.',
+            E_USER_DEPRECATED
+        );
+
+        return [
+            'apiKey'     => $apiKey,
+            'apiSecret'  => $apiSecret,
+            'pluginName' => $pluginName,
+            'pluginFile' => $pluginFile,
+            'slug'       => sanitize_title( $pluginName ),
+            'driver'     => 'open_panel',
+        ];
+    }
+
+    /**
+     * Get a copy of the current configuration array.
+     *
+     * @return array
+     */
+    public function getConfig(): array
+    {
+        return $this->config;
     }
 
     /**

@@ -305,4 +305,173 @@ class ClientTest extends TestCase
 
         $this->addToAssertionCount( 1 );
     }
+
+    // -----------------------------------------------------------------------
+    // BC-007 — Array constructor continues to work (US1)
+    // -----------------------------------------------------------------------
+
+    public function testArrayConstructorContinuesToWork(): void
+    {
+        $client = $this->makeClient();
+        $this->assertInstanceOf( Client::class, $client );
+    }
+
+    // -----------------------------------------------------------------------
+    // BC-008 — Legacy 4-param constructor does not throw (US1)
+    // -----------------------------------------------------------------------
+
+    public function testLegacyFourParamConstructorDoesNotThrow(): void
+    {
+        $client = @new Client( 'test-api-key', 'test-secret', 'My Plugin', '/path/to/plugin.php' );
+        $this->assertInstanceOf( Client::class, $client );
+    }
+
+    // -----------------------------------------------------------------------
+    // BC-009 — Invalid first arg throws InvalidArgumentException (US1)
+    // -----------------------------------------------------------------------
+
+    public function testInvalidFirstArgThrowsException(): void
+    {
+        $this->expectException( \InvalidArgumentException::class );
+        $this->expectExceptionMessage( 'First argument must be a configuration array or a string API key' );
+        new Client( 42 );
+    }
+
+    // -----------------------------------------------------------------------
+    // BC-010 — Too few positional params throws InvalidArgumentException (US1)
+    // -----------------------------------------------------------------------
+
+    public function testTooFewPositionalParamsThrowsException(): void
+    {
+        $this->expectException( \InvalidArgumentException::class );
+        $this->expectExceptionMessage( 'Legacy constructor requires exactly 4 string parameters' );
+        new Client( 'only-one-string' );
+    }
+
+    // -----------------------------------------------------------------------
+    // BC-011 — Empty API key throws InvalidArgumentException (US1)
+    // -----------------------------------------------------------------------
+
+    public function testEmptyApiKeyThrowsException(): void
+    {
+        $this->expectException( \InvalidArgumentException::class );
+        $this->expectExceptionMessage( 'API key must not be empty' );
+        new Client( '', 'secret', 'Name', '/path.php' );
+    }
+
+    // -----------------------------------------------------------------------
+    // BC-012 — Empty plugin file throws InvalidArgumentException (US1)
+    // -----------------------------------------------------------------------
+
+    public function testEmptyPluginFileThrowsException(): void
+    {
+        $this->expectException( \InvalidArgumentException::class );
+        $this->expectExceptionMessage( 'Plugin file path must not be empty' );
+        new Client( 'key', 'secret', 'Name', '' );
+    }
+
+    // -----------------------------------------------------------------------
+    // BC-013 — Empty plugin name throws InvalidArgumentException (US1)
+    // -----------------------------------------------------------------------
+
+    public function testEmptyPluginNameThrowsException(): void
+    {
+        $this->expectException( \InvalidArgumentException::class );
+        $this->expectExceptionMessage( 'Plugin name must not be empty' );
+        new Client( 'key', 'secret', '', '/path.php' );
+    }
+
+    // -----------------------------------------------------------------------
+    // BC-019 — Legacy constructor maps API key (US2)
+    // -----------------------------------------------------------------------
+
+    public function testLegacyConstructorMapsApiKey(): void
+    {
+        $client = @new Client( 'my-api-key', 'my-secret', 'My Plugin', '/path/to/plugin.php' );
+        $this->assertSame( 'my-api-key', $client->getConfig()['apiKey'] );
+    }
+
+    // -----------------------------------------------------------------------
+    // BC-020 — Legacy constructor maps plugin name (US2)
+    // -----------------------------------------------------------------------
+
+    public function testLegacyConstructorMapsPluginName(): void
+    {
+        $client = @new Client( 'my-api-key', 'my-secret', 'My Plugin', '/path/to/plugin.php' );
+        $this->assertSame( 'My Plugin', $client->getConfig()['pluginName'] );
+    }
+
+    // -----------------------------------------------------------------------
+    // BC-021 — Legacy constructor derives slug (US2)
+    // -----------------------------------------------------------------------
+
+    public function testLegacyConstructorDerivesSlug(): void
+    {
+        $client = @new Client( 'my-api-key', 'my-secret', 'My Plugin', '/path/to/plugin.php' );
+        $this->assertSame( sanitize_title( 'My Plugin' ), $client->getConfig()['slug'] );
+    }
+
+    // -----------------------------------------------------------------------
+    // BC-022 — Legacy constructor defaults driver to open_panel (US2)
+    // -----------------------------------------------------------------------
+
+    public function testLegacyConstructorDefaultsDriverToOpenPanel(): void
+    {
+        $client = @new Client( 'my-api-key', 'my-secret', 'My Plugin', '/path/to/plugin.php' );
+        $this->assertSame( 'open_panel', $client->getConfig()['driver'] );
+    }
+
+    // -----------------------------------------------------------------------
+    // BC-023 — Legacy constructor generates a unique_id (US2)
+    // -----------------------------------------------------------------------
+
+    public function testLegacyConstructorGeneratesUniqueId(): void
+    {
+        $client = @new Client( 'my-api-key', 'my-secret', 'My Plugin', '/path/to/plugin.php' );
+        $this->assertNotEmpty( $client->getConfig()['unique_id'] );
+    }
+
+    // -----------------------------------------------------------------------
+    // BC-027 — Legacy constructor emits deprecation notice (US3)
+    // -----------------------------------------------------------------------
+
+    public function testLegacyConstructorEmitsDeprecationNotice(): void
+    {
+        $deprecations = [];
+        set_error_handler( function ( int $errno, string $errstr ) use ( &$deprecations ): bool {
+            if ( E_USER_DEPRECATED === $errno ) {
+                $deprecations[] = $errstr;
+            }
+            return true;
+        } );
+
+        new Client( 'my-api-key', 'my-secret', 'My Plugin', '/path/to/plugin.php' );
+
+        restore_error_handler();
+
+        $this->assertNotEmpty( $deprecations, 'Legacy constructor must emit a deprecation notice.' );
+        $this->assertStringContainsString( 'Passing positional parameters to', $deprecations[0] );
+    }
+
+    // -----------------------------------------------------------------------
+    // BC-028 — Array constructor does NOT emit deprecation (US3)
+    // -----------------------------------------------------------------------
+
+    public function testArrayConstructorDoesNotEmitDeprecation(): void
+    {
+        // Use a custom error handler to catch any unexpected deprecation notices.
+        $deprecations = [];
+        set_error_handler( function ( int $errno, string $errstr ) use ( &$deprecations ): bool {
+            if ( E_USER_DEPRECATED === $errno ) {
+                $deprecations[] = $errstr;
+            }
+            return true;
+        } );
+
+        $this->makeClient();
+
+        restore_error_handler();
+
+        $this->assertEmpty( $deprecations, 'Array constructor must not emit deprecation notices.' );
+    }
 }

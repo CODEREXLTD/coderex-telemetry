@@ -369,6 +369,12 @@ if ( ! function_exists( 'dbDelta' ) ) {
     }
 }
 
+if ( ! function_exists( 'sanitize_title' ) ) {
+    function sanitize_title( string $title ): string {
+        return strtolower( preg_replace( '/[^a-z0-9\-_]/', '', preg_replace( '/\s+/', '-', $title ) ) );
+    }
+}
+
 /**
  * Reset all in-memory stub state between tests.
  *
