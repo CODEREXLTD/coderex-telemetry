@@ -36,14 +36,24 @@ class ReviewPrompt {
     // Constants
     // -------------------------------------------------------------------------
 
-    private const OPTION_STATUS = 'linno_review_status_';
-    private const OPTION_SNOOZE = 'linno_review_snooze_';
+    private const OPTION_STATUS       = 'linno_review_status_';
+    private const OPTION_SNOOZE       = 'linno_review_snooze_';
+    private const OPTION_SNOOZE_COUNT = 'linno_review_snooze_count_';
+    private const OPTION_TRIGGER      = 'linno_review_trigger_';
+
+    /**
+     * Tracks whether the initial snooze seed has been written for this plugin.
+     * Prevents the prompt from firing immediately on existing installations
+     * when event-triggered mode is activated for the first time.
+     */
+    private const OPTION_BOOTSTRAPPED = 'linno_review_bootstrapped_';
 
     private const DEFAULTS = [
         'lark_webhook'         => '',
         'min_feedback_length'  => 50,
         'days_after_install'   => 3,
         'snooze_days'          => 30,
+        'snooze_schedule'      => [],  // Progressive schedule e.g. [7, 30, 90]. When non-empty, enables event-triggered mode.
         'nps_question'         => '',
         'low_score_threshold'  => 7,   // 0–6 = detractors, 7–10 = promoters
         'position'             => 'middle', // middle | bottom-right | bottom-left | top-right | top-left
@@ -65,6 +75,13 @@ class ReviewPrompt {
 
     /** @var bool|null Cached decision for the current request. */
     private ?bool $should_show_cache = null;
+
+    /**
+     * Trigger context resolved during should_show() for use during render.
+     *
+     * @var array|null
+     */
+    private ?array $current_trigger = null;
 
     // -------------------------------------------------------------------------
     // Bootstrap
@@ -94,6 +111,7 @@ class ReviewPrompt {
      * Register WordPress hooks.
      */
     public function init(): void {
+        $this->maybe_bootstrap_snooze();
         add_action( 'admin_enqueue_scripts', [ $this, 'maybe_output_style' ] );
         add_action( 'admin_footer',          [ $this, 'render_prompt' ] );
         add_action( 'wp_ajax_' . $this->get_ajax_action(), [ $this, 'handle_ajax' ] );
@@ -122,6 +140,128 @@ class ReviewPrompt {
     /** JS global variable name (hyphens are not valid in JS identifiers). */
     private function get_js_global(): string {
         return 'linnoReview_' . str_replace( '-', '_', $this->slug );
+    }
+
+    private function get_snooze_count_option(): string {
+        return self::OPTION_SNOOZE_COUNT . $this->slug;
+    }
+
+    private function get_trigger_option(): string {
+        return self::OPTION_TRIGGER . $this->slug;
+    }
+
+    private function get_bootstrapped_option(): string {
+        return self::OPTION_BOOTSTRAPPED . $this->slug;
+    }
+
+    // -------------------------------------------------------------------------
+    // First-run bootstrap
+    // -------------------------------------------------------------------------
+
+    /**
+     * Seed an initial snooze for existing installations when event-triggered
+     * mode is activated for the first time.
+     *
+     * Without this, an old plugin install that already satisfies a trigger
+     * condition (e.g. 7+ days old with no funnels) would show the prompt
+     * immediately on the very first page load after the code update.
+     *
+     * Logic:
+     *   - Runs only when snooze_schedule is set (event-triggered mode).
+     *   - Runs only once per site (guarded by OPTION_BOOTSTRAPPED).
+     *   - If the plugin was installed more than one day ago, seeds
+     *     the snooze timestamp to "now" so the first interval starts
+     *     from today rather than from the past install date.
+     *   - New installs (≤ 1 day old) are unaffected — the schedule
+     *     runs naturally from first trigger.
+     *
+     * @return void
+     */
+    private function maybe_bootstrap_snooze(): void {
+        if ( empty( $this->config['snooze_schedule'] ) ) {
+            return;
+        }
+
+        if ( get_option( $this->get_bootstrapped_option() ) ) {
+            return;
+        }
+
+        // Mark as bootstrapped immediately to avoid running again.
+        update_option( $this->get_bootstrapped_option(), '1' );
+
+        $installed_time = (int) get_option( $this->config['installed_option_key'], 0 );
+        if ( ! $installed_time ) {
+            return;
+        }
+
+        $age_days = ( time() - $installed_time ) / DAY_IN_SECONDS;
+
+        // Only seed for existing installs — new installs (≤ 1 day) start clean.
+        if ( $age_days > 1.0 ) {
+            update_option( $this->get_snooze_option(), time() );
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Event-triggered prompt API
+    // -------------------------------------------------------------------------
+
+    /**
+     * Store a pending trigger that will cause the prompt to appear on the next
+     * eligible admin page load.
+     *
+     * Call this method from any WordPress hook that represents a meaningful user
+     * success or failure event (e.g. order placed, feature used, no funnel created).
+     *
+     * The $context array may contain prompt copy overrides:
+     *   - modal_title    (string) Modal header title.
+     *   - nps_question   (string) The NPS question shown to the user.
+     *   - feedback_msg   (string) Message above the detractor feedback textarea.
+     *   - thank_you_title (string)
+     *   - thank_you_text  (string)
+     *
+     * @param string $event_key  Short slug identifying the trigger type (e.g. 'funnel_order').
+     * @param array  $context    Optional metadata and copy-override keys.
+     * @return void
+     */
+    public function trigger_prompt( string $event_key, array $context = [] ): void {
+        if ( 'completed' === get_option( $this->get_status_option() ) ) {
+            return;
+        }
+
+        update_option(
+            $this->get_trigger_option(),
+            wp_json_encode( [
+                'event_key'    => sanitize_key( $event_key ),
+                'context'      => $context,
+                'triggered_at' => time(),
+            ] ),
+            false // Do not autoload — only needed on admin pages.
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Progressive snooze helper
+    // -------------------------------------------------------------------------
+
+    /**
+     * Return the effective snooze duration in days for the given dismiss count.
+     *
+     * When a snooze_schedule array is configured (e.g. [7, 30, 90]) the Nth
+     * dismissal uses schedule[N-1]; once the last value is reached it repeats.
+     * Falls back to the legacy scalar snooze_days when no schedule is set.
+     *
+     * @param int $snooze_count Total number of times the user has dismissed.
+     * @return int Days to snooze.
+     */
+    private function compute_effective_snooze_days( int $snooze_count ): int {
+        $schedule = (array) $this->config['snooze_schedule'];
+        if ( empty( $schedule ) ) {
+            return (int) $this->config['snooze_days'];
+        }
+        $index = max( 0, $snooze_count - 1 );
+        $index = min( $index, count( $schedule ) - 1 );
+        return (int) $schedule[ $index ];
     }
 
     // -------------------------------------------------------------------------
@@ -154,6 +294,18 @@ class ReviewPrompt {
             return $this->set_cache( false );
         }
 
+        // -----------------------------------------------------------------
+        // Event-triggered mode: snooze_schedule is set.
+        // The prompt only shows when trigger_prompt() has stored a pending
+        // trigger and the progressive snooze window has expired.
+        // -----------------------------------------------------------------
+        if ( ! empty( $this->config['snooze_schedule'] ) ) {
+            return $this->set_cache( $this->should_show_event_triggered() );
+        }
+
+        // -----------------------------------------------------------------
+        // Default page-load mode (legacy).
+        // -----------------------------------------------------------------
         $snooze_time = (int) get_option( $this->get_snooze_option(), 0 );
         if ( $snooze_time && time() < $snooze_time + ( (int) $this->config['snooze_days'] * DAY_IN_SECONDS ) ) {
             return $this->set_cache( false );
@@ -171,6 +323,45 @@ class ReviewPrompt {
         }
 
         return $this->set_cache( true );
+    }
+
+    /**
+     * Visibility decision for event-triggered mode.
+     *
+     * Returns true when a pending trigger exists and was stored after the
+     * current snooze window expired.
+     *
+     * @return bool
+     */
+    private function should_show_event_triggered(): bool {
+        $trigger_json = get_option( $this->get_trigger_option() );
+        if ( ! $trigger_json ) {
+            return false;
+        }
+
+        $trigger = json_decode( $trigger_json, true );
+        if ( ! is_array( $trigger ) || empty( $trigger['triggered_at'] ) ) {
+            return false;
+        }
+
+        $trigger_time = (int) $trigger['triggered_at'];
+
+        // Check whether the trigger occurred inside an active snooze window.
+        $snooze_set_at = (int) get_option( $this->get_snooze_option(), 0 );
+        if ( $snooze_set_at ) {
+            $snooze_count = (int) get_option( $this->get_snooze_count_option(), 0 );
+            $snooze_days  = $this->compute_effective_snooze_days( $snooze_count );
+            $snooze_until = $snooze_set_at + ( $snooze_days * DAY_IN_SECONDS );
+
+            // Only show if the trigger was stored after the snooze expired.
+            if ( $trigger_time < $snooze_until ) {
+                return false;
+            }
+        }
+
+        // Persist resolved trigger for use during render.
+        $this->current_trigger = $trigger;
+        return true;
     }
 
     private function set_cache( bool $value ): bool {
@@ -222,29 +413,32 @@ class ReviewPrompt {
         }
         ?>
         <style id="<?php echo esc_attr( $this->slug ); ?>-review-style">
-        /* === Overlay === */
-        .linno-nps-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99998;display:none}
-        .linno-nps-overlay.is-visible{display:flex}
-        /* position variants */
-        .linno-nps-pos-middle{align-items:center;justify-content:center}
-        .linno-nps-pos-bottom-right{align-items:flex-end;justify-content:flex-end;padding:20px}
-        .linno-nps-pos-bottom-left{align-items:flex-end;justify-content:flex-start;padding:20px}
-        .linno-nps-pos-top-right{align-items:flex-start;justify-content:flex-end;padding:20px}
-        .linno-nps-pos-top-left{align-items:flex-start;justify-content:flex-start;padding:20px}
-        /* === Modal card === */
-        .linno-nps-modal{background:#fff;border-radius:16px;width:520px;max-width:calc(100vw - 32px);box-shadow:0 24px 48px -12px rgba(0,0,0,.2);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif;overflow:hidden}
+        /* === Wrapper (no overlay — background stays fully interactive) === */
+        .linno-nps-overlay{position:fixed;inset:0;background:transparent;z-index:99998;display:none;pointer-events:none}
+        .linno-nps-overlay.is-visible{display:block}
+        /* === Modal card: anchored to a corner via fixed positioning === */
+        .linno-nps-modal{position:fixed;background:#fff;border-radius:16px;width:400px;max-width:calc(100vw - 32px);box-shadow:0 8px 32px rgba(0,0,0,.14),0 1.5px 6px rgba(0,0,0,.08);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif;overflow:hidden;pointer-events:all;animation:linno-slide-in .25s ease}
+        @keyframes linno-slide-in{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+        /* position variants — applied to the modal card itself */
+        .linno-nps-pos-middle .linno-nps-modal{top:50%;left:50%;transform:translate(-50%,-50%)}
+        .linno-nps-pos-middle .linno-nps-modal:not([style]){animation:linno-fade-in .25s ease}
+        @keyframes linno-fade-in{from{opacity:0}to{opacity:1}}
+        .linno-nps-pos-bottom-right .linno-nps-modal{bottom:24px;right:24px}
+        .linno-nps-pos-bottom-left .linno-nps-modal{bottom:24px;left:24px}
+        .linno-nps-pos-top-right .linno-nps-modal{top:52px;right:24px}
+        .linno-nps-pos-top-left .linno-nps-modal{top:52px;left:24px}
         /* === Header === */
-        .linno-nps-header{padding:20px 24px 0;display:flex;justify-content:space-between;align-items:center}
-        .linno-nps-title{color:#1D2327;font-size:18px;font-weight:600;line-height:1}
+        .linno-nps-header{padding:18px 20px 0;display:flex;justify-content:space-between;align-items:center}
+        .linno-nps-title{color:#1D2327;font-size:16px;font-weight:600;line-height:1}
         .linno-nps-close{cursor:pointer;padding:2px;border:none;background:none;display:flex;color:#6b7280}
         .linno-nps-close:hover{color:#374151}
         /* === Body === */
-        .linno-nps-body{padding:20px 24px 24px}
+        .linno-nps-body{padding:16px 20px 20px}
         /* === Step 1: NPS question === */
-        .linno-nps-question{color:#374151;font-size:15px;line-height:1.55;margin-bottom:20px}
+        .linno-nps-question{color:#374151;font-size:14px;line-height:1.55;margin-bottom:16px}
         /* NPS buttons row */
-        .linno-nps-scores{display:grid;grid-template-columns:repeat(11,1fr);gap:6px;margin-bottom:10px}
-        .linno-nps-score-btn{aspect-ratio:1;width:100%;border-radius:50%;border:1.5px solid #d1d5db;background:#fff;cursor:pointer;font-size:13px;font-weight:600;color:#374151;display:flex;align-items:center;justify-content:center;transition:all .15s ease;padding:0}
+        .linno-nps-scores{display:grid;grid-template-columns:repeat(11,1fr);gap:5px;margin-bottom:8px}
+        .linno-nps-score-btn{aspect-ratio:1;width:100%;border-radius:50%;border:1.5px solid #d1d5db;background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:#374151;display:flex;align-items:center;justify-content:center;transition:all .15s ease;padding:0}
         .linno-nps-score-btn:hover{border-color:#6E42D3;color:#6E42D3;background:#f5f0ff}
         /* selected colours by sentiment */
         .linno-nps-score-btn.nps-selected-low {border-color:#ef4444;background:#fef2f2;color:#b91c1c}
@@ -295,11 +489,18 @@ class ReviewPrompt {
 
         $slug            = esc_attr( $this->slug );
         $min_chars       = (int) $this->config['min_feedback_length'];
-        $nps_question    = esc_html( $this->config['nps_question'] );
-        $privacy_url     = esc_url( $this->config['privacy_url'] );
-        $support_url     = esc_url( $this->config['support_url'] );
         $low_threshold   = (int) $this->config['low_score_threshold']; // 0 – (threshold-1) = low
         $position        = sanitize_key( $this->config['position'] ?: 'middle' );
+
+        // Dynamic copy: trigger context values override static config defaults.
+        $ctx             = is_array( $this->current_trigger ) ? (array) ( $this->current_trigger['context'] ?? [] ) : [];
+        $nps_question    = esc_html( ! empty( $ctx['nps_question'] )    ? $ctx['nps_question']    : $this->config['nps_question'] );
+        $modal_title     = esc_html( ! empty( $ctx['modal_title'] )     ? $ctx['modal_title']     : 'Share Your Feedback' );
+        $feedback_msg    = esc_html( ! empty( $ctx['feedback_msg'] )    ? $ctx['feedback_msg']    : "We're sorry to hear that. What's not working for you?" );
+        $thank_you_title = esc_html( ! empty( $ctx['thank_you_title'] ) ? $ctx['thank_you_title'] : 'Thank you for your support!' );
+        $thank_you_text  = esc_html( ! empty( $ctx['thank_you_text'] )  ? $ctx['thank_you_text']  : "We're thrilled you love it! Your review helps other users discover us." );
+        $privacy_url     = esc_url( $this->config['privacy_url'] );
+        $support_url     = esc_url( $this->config['support_url'] );
         ?>
 
         <!-- Linno NPS overlay -->
@@ -309,7 +510,7 @@ class ReviewPrompt {
 
                 <!-- Header -->
                 <div class="linno-nps-header">
-                    <span class="linno-nps-title" id="<?php echo $slug; ?>-nps-title">Share Your Feedback</span>
+                    <span class="linno-nps-title" id="<?php echo $slug; ?>-nps-title"><?php echo $modal_title; ?></span>
                     <button type="button" class="linno-nps-close" id="<?php echo $slug; ?>-nps-close"
                             aria-label="<?php esc_attr_e( 'Close', 'linno-telemetry' ); ?>">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
@@ -346,7 +547,7 @@ class ReviewPrompt {
                     <!-- Step 2a: Low-score feedback form (scores 0 – threshold-1) -->
                     <div id="<?php echo $slug; ?>-nps-feedback" class="linno-nps-feedback">
                         <p class="linno-nps-feedback-msg" id="<?php echo $slug; ?>-nps-feedback-msg">
-                            We&rsquo;re sorry to hear that. What&rsquo;s not working for you?
+                            <?php echo $feedback_msg; ?>
                         </p>
 
                         <label class="linno-nps-feedback-label" for="<?php echo $slug; ?>-nps-textarea">
@@ -388,9 +589,9 @@ class ReviewPrompt {
                     <!-- Step 2b: High-score thank-you -->
                     <div id="<?php echo $slug; ?>-nps-thankyou" class="linno-nps-thankyou">
                         <div class="linno-nps-thankyou-icon">&#127881;</div>
-                        <div class="linno-nps-thankyou-title">Thank you for your support!</div>
+                        <div class="linno-nps-thankyou-title"><?php echo $thank_you_title; ?></div>
                         <p class="linno-nps-thankyou-text">
-                            We&rsquo;re thrilled you love it! Your review helps other users discover us.
+                            <?php echo $thank_you_text; ?>
                         </p>
                     </div>
 
@@ -458,11 +659,6 @@ class ReviewPrompt {
 
                 // Close button — snooze.
                 $(closeBtn).on('click', closeModal);
-
-                // Click outside modal — snooze.
-                $(overlay).on('click', function (e) {
-                    if ($(e.target).is(overlay)) { closeModal(); }
-                });
 
                 // NPS score buttons.
                 $(scoresEl).on('click', '.linno-nps-score-btn', function () {
@@ -537,6 +733,12 @@ class ReviewPrompt {
             : '';
 
         if ( 'snooze' === $type ) {
+            // In event-triggered mode, increment the dismiss counter so the
+            // next snooze interval is fetched from the progressive schedule.
+            if ( ! empty( $this->config['snooze_schedule'] ) ) {
+                $snooze_count = (int) get_option( $this->get_snooze_count_option(), 0 ) + 1;
+                update_option( $this->get_snooze_count_option(), $snooze_count );
+            }
             update_option( $this->get_snooze_option(), time() );
 
         } elseif ( 'completed' === $type ) {
