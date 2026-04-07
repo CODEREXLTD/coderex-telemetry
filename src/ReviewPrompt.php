@@ -46,6 +46,7 @@ class ReviewPrompt {
         'snooze_days'          => 30,
         'nps_question'         => '',
         'low_score_threshold'  => 7,   // 0–6 = detractors, 7–10 = promoters
+        'position'             => 'middle', // middle | bottom-right | bottom-left | top-right | top-left
         'review_url'           => '',
         'support_url'          => '',
         'privacy_url'          => 'https://rextheme.com/privacy-policy/',
@@ -222,8 +223,14 @@ class ReviewPrompt {
         ?>
         <style id="<?php echo esc_attr( $this->slug ); ?>-review-style">
         /* === Overlay === */
-        .linno-nps-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99998;display:none;align-items:center;justify-content:center}
+        .linno-nps-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99998;display:none}
         .linno-nps-overlay.is-visible{display:flex}
+        /* position variants */
+        .linno-nps-pos-middle{align-items:center;justify-content:center}
+        .linno-nps-pos-bottom-right{align-items:flex-end;justify-content:flex-end;padding:20px}
+        .linno-nps-pos-bottom-left{align-items:flex-end;justify-content:flex-start;padding:20px}
+        .linno-nps-pos-top-right{align-items:flex-start;justify-content:flex-end;padding:20px}
+        .linno-nps-pos-top-left{align-items:flex-start;justify-content:flex-start;padding:20px}
         /* === Modal card === */
         .linno-nps-modal{background:#fff;border-radius:16px;width:520px;max-width:calc(100vw - 32px);box-shadow:0 24px 48px -12px rgba(0,0,0,.2);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif;overflow:hidden}
         /* === Header === */
@@ -292,10 +299,11 @@ class ReviewPrompt {
         $privacy_url     = esc_url( $this->config['privacy_url'] );
         $support_url     = esc_url( $this->config['support_url'] );
         $low_threshold   = (int) $this->config['low_score_threshold']; // 0 – (threshold-1) = low
+        $position        = sanitize_key( $this->config['position'] ?: 'middle' );
         ?>
 
         <!-- Linno NPS overlay -->
-        <div id="<?php echo $slug; ?>-nps-overlay" class="linno-nps-overlay">
+        <div id="<?php echo $slug; ?>-nps-overlay" class="linno-nps-overlay linno-nps-pos-<?php echo esc_attr( $position ); ?>">
             <div class="linno-nps-modal" role="dialog" aria-modal="true"
                  aria-labelledby="<?php echo $slug; ?>-nps-title">
 
