@@ -121,6 +121,16 @@ class Client {
     private ?TriggerManager $trigger_manager = null;
 
     /**
+     * ReviewPrompt instance.
+     *
+     * Populated when a 'review_prompt' config array is provided, or when
+     * enable_review_prompt() is called after construction.
+     *
+     * @var ReviewPrompt|null
+     */
+    private ?ReviewPrompt $review_prompt = null;
+
+    /**
      * Constructor
      *
      * Accepts either an array configuration or the legacy 4-positional-parameter signature.
@@ -387,6 +397,7 @@ class Client {
         $this->handlers['consent']->init();
         $this->handlers['deactivation']->init();
         $this->init_triggers();
+        $this->init_review_prompt();
 
         // Internally register activation and deactivation hooks
         register_activation_hook( $this->config['pluginFile'], [ $this, 'activate' ] );
@@ -404,6 +415,41 @@ class Client {
         if ( $this->isOptInEnabled() ) {
             $this->finalize_optin_setup();
         }
+    }
+
+    /**
+     * Initialize the review prompt if config was supplied.
+     *
+     * @return void
+     */
+    private function init_review_prompt(): void {
+        if ( isset( $this->config['review_prompt'] ) && is_array( $this->config['review_prompt'] ) ) {
+            $this->review_prompt = new ReviewPrompt( $this, $this->config['review_prompt'] );
+            $this->review_prompt->init();
+        }
+    }
+
+    /**
+     * Enable (or reconfigure) the review prompt after construction.
+     *
+     * Can be called at any time before admin hooks fire.
+     *
+     * @param array $config ReviewPrompt config array (see ReviewPrompt class docblock).
+     * @return self
+     */
+    public function enable_review_prompt( array $config = [] ): self {
+        $this->review_prompt = new ReviewPrompt( $this, $config );
+        $this->review_prompt->init();
+        return $this;
+    }
+
+    /**
+     * Get the ReviewPrompt instance, or null if not enabled.
+     *
+     * @return ReviewPrompt|null
+     */
+    public function get_review_prompt(): ?ReviewPrompt {
+        return $this->review_prompt;
     }
 
     /**
