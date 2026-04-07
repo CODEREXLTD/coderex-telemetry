@@ -236,8 +236,8 @@ class ReviewPrompt {
         /* === Step 1: NPS question === */
         .linno-nps-question{color:#374151;font-size:15px;line-height:1.55;margin-bottom:20px}
         /* NPS buttons row */
-        .linno-nps-scores{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
-        .linno-nps-score-btn{width:40px;height:40px;border-radius:50%;border:1.5px solid #d1d5db;background:#fff;cursor:pointer;font-size:14px;font-weight:600;color:#374151;display:flex;align-items:center;justify-content:center;transition:all .15s ease;flex-shrink:0}
+        .linno-nps-scores{display:grid;grid-template-columns:repeat(11,1fr);gap:6px;margin-bottom:10px}
+        .linno-nps-score-btn{aspect-ratio:1;width:100%;border-radius:50%;border:1.5px solid #d1d5db;background:#fff;cursor:pointer;font-size:13px;font-weight:600;color:#374151;display:flex;align-items:center;justify-content:center;transition:all .15s ease;padding:0}
         .linno-nps-score-btn:hover{border-color:#6E42D3;color:#6E42D3;background:#f5f0ff}
         /* selected colours by sentiment */
         .linno-nps-score-btn.nps-selected-low {border-color:#ef4444;background:#fef2f2;color:#b91c1c}
