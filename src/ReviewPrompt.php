@@ -744,6 +744,13 @@ class ReviewPrompt {
         } elseif ( 'completed' === $type ) {
             update_option( $this->get_status_option(), 'completed' );
 
+            $nps_score = isset( $_POST['nps_score'] ) && is_numeric( $_POST['nps_score'] )
+                ? (int) $_POST['nps_score'] : null;
+
+            if ( null !== $nps_score ) {
+                $this->track_nps_to_posthog( $nps_score, '' );
+            }
+
         } elseif ( 'feedback' === $type ) {
             update_option( $this->get_status_option(), 'completed' );
 
@@ -752,12 +759,78 @@ class ReviewPrompt {
             $nps_score = isset( $_POST['nps_score'] ) && is_numeric( $_POST['nps_score'] )
                 ? (int) $_POST['nps_score'] : null;
 
+            $this->track_nps_to_posthog( $nps_score, $feedback );
+
             if ( ! empty( $feedback ) && ! empty( $this->config['lark_webhook'] ) ) {
                 $this->send_feedback( $feedback, $nps_score );
             }
         }
 
         wp_send_json_success();
+    }
+
+    // -------------------------------------------------------------------------
+    // PostHog NPS tracking
+    // -------------------------------------------------------------------------
+
+    /**
+     * Send the NPS submission to PostHog via the parent Client.
+     *
+     * Event name : nps_survey_submitted
+     * Properties :
+     *   nps_score      int          0–10 raw score.
+     *   nps_category   string       promoter | passive | detractor.
+     *   feedback       string       Detractor feedback text (empty for promoters).
+     *   trigger_event  string       The event_key that triggered this prompt.
+     *   snooze_count   int          How many times the user dismissed before submitting.
+     *   product_slug   string       Plugin slug.
+     *
+     * Uses track_immediate() so the event is dispatched in the same request,
+     * bypassing the background queue to guarantee delivery on form submit.
+     *
+     * @param int|null $nps_score Raw score (0–10), or null if not captured.
+     * @param string   $feedback  Detractor feedback text.
+     * @return void
+     */
+    private function track_nps_to_posthog( ?int $nps_score, string $feedback ): void {
+        $low_threshold = (int) $this->config['low_score_threshold'];
+
+        if ( null !== $nps_score ) {
+            if ( $nps_score < $low_threshold ) {
+                $category = 'detractor';
+            } elseif ( $nps_score <= 8 ) {
+                $category = 'passive';
+            } else {
+                $category = 'promoter';
+            }
+        } else {
+            $category = 'unknown';
+        }
+
+        // Resolve the trigger event key from the stored trigger payload.
+        $trigger_json  = get_option( $this->get_trigger_option() );
+        $trigger_data  = $trigger_json ? json_decode( $trigger_json, true ) : [];
+        $trigger_event = isset( $trigger_data['event_key'] ) ? sanitize_key( $trigger_data['event_key'] ) : 'unknown';
+        $snooze_count  = (int) get_option( $this->get_snooze_count_option(), 0 );
+
+        $properties = [
+            'nps_score'     => $nps_score,
+            'nps_category'  => $category,
+            'feedback'      => $feedback,
+            'trigger_event' => $trigger_event,
+            'snooze_count'  => $snooze_count,
+            'product_slug'  => $this->slug,
+        ];
+
+        try {
+            // track_immediate() sends directly to the configured driver (PostHog)
+            // without queuing, using override=true to bypass the opt-in check
+            // since this is an explicit user action (they chose to submit).
+            $this->client->track_immediate( 'nps_survey_submitted', $properties, true );
+        } catch ( \Exception $e ) {
+            // Failure-safe — NPS tracking must not surface errors to the user.
+            error_log( '[Linno Review Prompt] PostHog NPS track failed for ' . $this->slug . ': ' . $e->getMessage() );
+        }
     }
 
     // -------------------------------------------------------------------------
