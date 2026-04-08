@@ -39,5 +39,10 @@
                 "Fix PHP 8.2+ deprecated string interpolation": "patches/posthog-php-php82.patch"
             }
         }
+    },
+    "config": {
+        "allow-plugins": {
+            "cweagans/composer-patches": true
+        }
     }
 }
