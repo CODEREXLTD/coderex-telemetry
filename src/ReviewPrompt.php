@@ -11,7 +11,7 @@
  *
  * Config options
  * --------------
- * lark_webhook         (string)   Webhook URL that receives feedback payloads.
+ * webhook         (string)   Webhook URL that receives feedback payloads.
  * min_feedback_length  (int)      Minimum textarea chars before submit (default 50).
  * days_after_install   (int)      Days after install before showing (default 3).
  * snooze_days          (int)      Days between re-shows after snooze (default 30).
@@ -49,7 +49,7 @@ class ReviewPrompt {
     private const OPTION_BOOTSTRAPPED = 'linno_review_bootstrapped_';
 
     private const DEFAULTS = [
-        'lark_webhook'         => '',
+        'webhook'         => '',
         'min_feedback_length'  => 50,
         'days_after_install'   => 3,
         'snooze_days'          => 30,
@@ -761,7 +761,7 @@ class ReviewPrompt {
 
             $this->track_nps_to_posthog( $nps_score, $feedback );
 
-            if ( ! empty( $feedback ) && ! empty( $this->config['lark_webhook'] ) ) {
+            if ( ! empty( $feedback ) && ! empty( $this->config['webhook'] ) ) {
                 $this->send_feedback( $feedback, $nps_score );
             }
         }
@@ -852,7 +852,7 @@ class ReviewPrompt {
         ];
 
         $response = wp_remote_post(
-            $this->config['lark_webhook'],
+            $this->config['webhook'],
             [
                 'headers' => [ 'Content-Type' => 'application/json' ],
                 'body'    => wp_json_encode( $payload ),
@@ -862,7 +862,7 @@ class ReviewPrompt {
 
         if ( is_wp_error( $response ) ) {
             error_log(
-                '[Linno Review Prompt] Lark webhook failed for ' . $this->slug
+                '[Linno Review Prompt] webhook failed for ' . $this->slug
                 . ': ' . $response->get_error_message()
             );
         }
