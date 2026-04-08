@@ -272,6 +272,12 @@ class ReviewPrompt {
      * Determine whether the prompt should be rendered on this page load.
      */
     public function should_show(): bool {
+        // Developer test-mode bypass: ?{slug}_test_review=1
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        if ( isset( $_GET[ $this->slug . '_test_review' ] ) && '1' === $_GET[ $this->slug . '_test_review' ] ) {
+            return $this->set_cache( true );
+        }
+
         if ( null !== $this->should_show_cache ) {
             return $this->should_show_cache;
         }
@@ -282,12 +288,6 @@ class ReviewPrompt {
 
         if ( ! $this->is_allowed_screen() ) {
             return $this->set_cache( false );
-        }
-
-        // Developer test-mode bypass: ?{slug}_test_review=1
-        // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-        if ( isset( $_GET[ $this->slug . '_test_review' ] ) && '1' === $_GET[ $this->slug . '_test_review' ] ) {
-            return $this->set_cache( true );
         }
 
         if ( 'completed' === get_option( $this->get_status_option() ) ) {
@@ -851,12 +851,19 @@ class ReviewPrompt {
             'submittedAt' => current_time( 'mysql' ),
         ];
 
+        $is_local = in_array(
+            wp_get_environment_type(),
+            [ 'local', 'development' ],
+            true
+        );
+
         $response = wp_remote_post(
             $this->config['webhook'],
             [
-                'headers' => [ 'Content-Type' => 'application/json' ],
-                'body'    => wp_json_encode( $payload ),
-                'timeout' => 8,
+                'headers'   => [ 'Content-Type' => 'application/json' ],
+                'body'      => wp_json_encode( $payload ),
+                'timeout'   => 8,
+                'sslverify' => ! $is_local,
             ]
         );
 
