@@ -11,8 +11,7 @@
     ],
     "require": {
         "php": ">=7.4",
-        "posthog/posthog-php": "^2.1",
-        "cweagans/composer-patches": "^1.7"
+        "posthog/posthog-php": "^2.1"
     },
     "require-dev": {
         "phpunit/phpunit": "^9.5",
@@ -33,16 +32,6 @@
     },
     "minimum-stability": "stable",
     "prefer-stable": true,
-    "extra": {
-        "patches": {
-            "posthog/posthog-php": {
-                "Fix PHP 8.2+ deprecated string interpolation": "patches/posthog-php-php82.patch"
-            }
-        }
-    },
     "config": {
-        "allow-plugins": {
-            "cweagans/composer-patches": true
-        }
     }
 }
