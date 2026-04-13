@@ -1,0 +1,39 @@
+diff --git a/lib/PostHog.php b/lib/PostHog.php
+index 4286212..5db0a49 100644
+--- a/lib/PostHog.php
++++ b/lib/PostHog.php
+@@ -173,7 +173,7 @@ class PostHog
+     public static function validate($msg, $type)
+     {
+         $distinctId = !empty($msg["distinctId"]);
+-        self::assert($distinctId, "PostHog::${type}() requires distinctId");
++        self::assert($distinctId, "PostHog::{$type}() requires distinctId");
+     }
+ 
+     /**
+diff --git a/lib/Consumer/ForkCurl.php b/lib/Consumer/ForkCurl.php
+index 262c270..7bc07ea 100644
+--- a/lib/Consumer/ForkCurl.php
++++ b/lib/Consumer/ForkCurl.php
+@@ -87,7 +87,7 @@ class ForkCurl extends Consumer
+         // Send user agent in the form of {library_name}/{library_version} as per RFC 7231.
+         $libName = $messages[0]['library'];
+         $libVersion = $messages[0]['library_version'];
+-        $cmd .= " -H 'User-Agent: ${libName}/${libVersion}'";
++        $cmd .= " -H 'User-Agent: {$libName}/{$libVersion}'";
+ 
+         if (!$this->debug()) {
+             $cmd .= " > /dev/null 2>&1 &";
+diff --git a/lib/Consumer/Socket.php b/lib/Consumer/Socket.php
+index f1db8bb..83aa2aa 100644
+--- a/lib/Consumer/Socket.php
++++ b/lib/Consumer/Socket.php
+@@ -187,7 +187,7 @@ class Socket extends Consumer
+         $content_json = json_decode($content, true);
+         $libName = $content_json['batch'][0]['library'];
+         $libVersion = $content_json['batch'][0]['library_version'];
+-        $req .= "User-Agent: ${libName}/${libVersion}\r\n";
++        $req .= "User-Agent: {$libName}/{$libVersion}\r\n";
+ 
+         // Compress content if compress_request is true
+         if ($this->compress_request) {
