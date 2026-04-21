@@ -347,15 +347,18 @@ class ReviewPrompt {
         $trigger_time = (int) $trigger['triggered_at'];
 
         // Check whether the trigger occurred inside an active snooze window.
+        // Bootstrap-seeded snooze (snooze_count = 0) does NOT block event triggers —
+        // only a user-initiated dismiss (snooze_count > 0) should suppress the prompt.
         $snooze_set_at = (int) get_option( $this->get_snooze_option(), 0 );
         if ( $snooze_set_at ) {
             $snooze_count = (int) get_option( $this->get_snooze_count_option(), 0 );
-            $snooze_days  = $this->compute_effective_snooze_days( $snooze_count );
-            $snooze_until = $snooze_set_at + ( $snooze_days * DAY_IN_SECONDS );
+            if ( $snooze_count > 0 ) {
+                $snooze_days  = $this->compute_effective_snooze_days( $snooze_count );
+                $snooze_until = $snooze_set_at + ( $snooze_days * DAY_IN_SECONDS );
 
-            // Only show if the trigger was stored after the snooze expired.
-            if ( $trigger_time < $snooze_until ) {
-                return false;
+                if ( $trigger_time < $snooze_until ) {
+                    return false;
+                }
             }
         }
 
