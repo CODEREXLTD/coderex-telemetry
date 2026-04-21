@@ -65,32 +65,31 @@ class Deactivation {
 
         $this->deactivation_modal_styles();
         $reasons = $this->get_uninstall_reasons();
+        $nonce   = wp_create_nonce( $this->client->get_slug() . '-deactivation-nonce' );
+        $slug    = $this->client->get_slug();
         ?>
-        <div class="wd-dr-modal" id="<?php echo $this->client->get_slug(); ?>-wd-dr-modal">
+        <div class="wd-dr-modal" id="<?php echo esc_attr( $slug ); ?>-wd-dr-modal">
             <div class="wd-dr-modal-wrap">
                 <div class="wd-dr-modal-header">
-                    <h3><?php _e( 'Goodbyes are always hard. If you have a moment, please let us know how we can improve.', $this->textDomain ); ?></h3>
+                    <h3><?php _e( 'Quick question before you go — what\'s the main reason?', $this->textDomain ); ?></h3>
+                    <p class="wd-dr-modal-subheading"><?php _e( 'One click is all it takes. Your feedback helps us improve.', $this->textDomain ); ?></p>
                 </div>
 
                 <div class="wd-dr-modal-body">
                     <ul class="wd-de-reasons">
                         <?php foreach ( $reasons as $reason ) { ?>
-                            <li data-placeholder="<?php echo esc_attr( $reason['placeholder'] ); ?>">
-                                <label>
-                                    <input type="radio" name="selected-reason" value="<?php echo $reason['id']; ?>">
+                            <li data-reason-id="<?php echo esc_attr( $reason['id'] ); ?>">
+                                <button type="button" class="wd-de-reason-btn">
                                     <div class="wd-de-reason-icon"><?php echo $reason['icon']; ?></div>
-                                    <div class="wd-de-reason-text"><?php echo $reason['text']; ?></div>
-                                </label>
+                                    <div class="wd-de-reason-text"><?php echo esc_html( $reason['text'] ); ?></div>
+                                </button>
                             </li>
                         <?php } ?>
                     </ul>
-                    <div class="wd-dr-modal-reason-input"><textarea></textarea></div>
                 </div>
 
                 <div class="wd-dr-modal-footer">
-                    <a href="#" class="dont-bother-me wd-dr-button-secondary"><?php _e( 'Skip & Deactivate', $this->textDomain ); ?></a>
-                    <button class="wd-dr-button-secondary wd-dr-cancel-modal"><?php _e( 'Cancel', $this->textDomain ); ?></button>
-                    <button class="wd-dr-submit-modal"><?php _e( 'Submit & Deactivate', $this->textDomain ); ?></button>
+                    <button type="button" class="wd-dr-button-secondary wd-dr-cancel-modal"><?php _e( 'Cancel', $this->textDomain ); ?></button>
                 </div>
             </div>
         </div>
@@ -98,58 +97,44 @@ class Deactivation {
         <script type="text/javascript">
             (function($) {
                 $(function() {
-                    var modal = $('#<?php echo $this->client->get_slug(); ?>-wd-dr-modal');
+                    var modal          = $('#<?php echo esc_js( $slug ); ?>-wd-dr-modal');
                     var deactivateLink = '';
+                    var submitting     = false;
 
-                    // Open modal
-                    $('#the-list').on('click', 'a.<?php echo $this->client->get_slug(); ?>-deactivation-link', function(e) {
+                    // Open modal — capture the real deactivation URL before showing
+                    $('#the-list').on('click', 'a.<?php echo esc_js( $slug ); ?>-deactivation-link', function(e) {
                         e.preventDefault();
-
-                        modal.addClass('modal-active');
                         deactivateLink = $(this).attr('href');
-                        modal.find('a.dont-bother-me').attr('href', deactivateLink).css('float', 'left');
+                        submitting     = false;
+                        modal.find('.wd-de-reason-btn').prop('disabled', false);
+                        modal.find('li').removeClass('wd-de-reason-selected');
+                        modal.addClass('modal-active');
                     });
 
-                    // Close modal; Cancel
+                    // Cancel — close without deactivating
                     modal.on('click', 'button.wd-dr-cancel-modal', function(e) {
                         e.preventDefault();
                         modal.removeClass('modal-active');
                     });
 
-                    // Reason change
-                    modal.on('click', 'input[type="radio"]', function() {
-                        var parent = $(this).parents('li');
-                        modal.find('li').removeClass('wd-de-reason-selected');
-                        parent.addClass('wd-de-reason-selected');
-                        $('.wd-dr-modal-reason-input').show();
-                        $('.wd-dr-modal-reason-input textarea').attr('placeholder', parent.data('placeholder')).focus();
-                    });
+                    // One-click reason card → submit reason then deactivate
+                    modal.on('click', '.wd-de-reason-btn', function() {
+                        if (submitting || !deactivateLink) return;
+                        submitting = true;
 
-                    // Submit response
-                    modal.on('click', 'button.wd-dr-submit-modal', function(e) {
-                        e.preventDefault();
+                        var reasonId = $(this).closest('li').data('reason-id');
 
-                        var button = $(this);
-
-                        if (button.hasClass('disabled')) {
-                            return;
-                        }
-
-                        var $radio = $('input[type="radio"]:checked', modal);
-                        var $input = $('.wd-dr-modal-reason-input textarea');
+                        $(this).closest('li').addClass('wd-de-reason-selected');
+                        modal.find('.wd-de-reason-btn').prop('disabled', true);
 
                         $.ajax({
-                            url: ajaxurl,
+                            url:  ajaxurl,
                             type: 'POST',
                             data: {
-                                nonce: '<?php echo wp_create_nonce( $this->client->get_slug() . '-deactivation-nonce' ); ?>',
-                                action: '<?php echo $this->client->get_slug(); ?>_submit_deactivation_reason',
-                                reason_id: (0 === $radio.length) ? 'none' : $radio.val(),
-                                reason_info: (0 !== $input.length) ? $input.val().trim() : ''
-                            },
-                            beforeSend: function() {
-                                button.addClass('disabled');
-                                button.text('<?php _e( "Processing...", $this->textDomain ); ?>');
+                                nonce:       '<?php echo esc_js( $nonce ); ?>',
+                                action:      '<?php echo esc_js( $slug ); ?>_submit_deactivation_reason',
+                                reason_id:   reasonId,
+                                reason_info: ''
                             },
                             complete: function() {
                                 window.location.href = deactivateLink;
@@ -190,157 +175,128 @@ class Deactivation {
             }
 
             .wd-dr-modal-wrap {
-                max-width: 870px;
+                max-width: 780px;
                 width: 100%;
                 position: relative;
-                margin: 10% auto;
+                margin: 8% auto;
                 background: #fff;
+                border-radius: 8px;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.18);
             }
 
             .wd-dr-modal-header {
                 border-bottom: 1px solid #E8E8E8;
-                padding: 20px 20px 18px 20px;
+                padding: 24px 24px 16px 24px;
             }
 
             .wd-dr-modal-header h3 {
-                line-height: 1.8;
+                line-height: 1.5;
+                margin: 0 0 4px 0;
+                color: #1a1a2e;
+                font-size: 16px;
+                font-weight: 600;
+            }
+
+            .wd-dr-modal-subheading {
                 margin: 0;
-                color: #4A5568;
+                color: #718096;
+                font-size: 13px;
             }
 
             .wd-dr-modal-body {
-                padding: 5px 20px 20px 20px;
-            }
-
-            .wd-dr-modal-body .reason-input {
-                margin-top: 5px;
-                margin-left: 20px;
+                padding: 20px 24px 8px 24px;
             }
 
             .wd-dr-modal-footer {
                 border-top: 1px solid #E8E8E8;
-                padding: 20px;
-                text-align: right;
+                padding: 16px 24px;
+                display: flex;
+                align-items: center;
+                justify-content: flex-end;
             }
 
             ul.wd-de-reasons {
                 display: flex;
-                margin: 0 -5px 0 -5px;
-                padding: 15px 0 20px 0;
-				flex-wrap: wrap;
+                flex-wrap: wrap;
+                margin: 0 -6px 12px -6px;
+                padding: 0;
+                list-style: none;
             }
 
             ul.wd-de-reasons li {
-                padding: 0 5px;
-                margin: 0 0 10px 0;
+                padding: 0 6px;
+                margin: 0 0 12px 0;
                 width: 25%;
             }
 
-            ul.wd-de-reasons label {
-                position: relative;
-                border: 1px solid #E8E8E8;
-                border-radius: 4px;
-                display: block;
+            .wd-de-reason-btn {
+                width: 100%;
+                border: 1.5px solid #E8E8E8;
+                border-radius: 6px;
+                background: #fff;
+                cursor: pointer;
                 text-align: center;
+                padding: 14px 8px 12px 8px;
+                transition: border-color 0.15s, background 0.15s, transform 0.1s;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 8px;
                 height: 100%;
-                padding: 15px 3px 8px 3px;
             }
 
-            ul.wd-de-reasons label:after {
-                width: 0;
-                height: 0;
-                border-left: 8px solid transparent;
-                border-right: 8px solid transparent;
-                border-top: 10px solid #3B86FF;
-                position: absolute;
-                left: 50%;
-                top: 100%;
-                margin-left: -8px;
-				content: '';
-				display: none;
+            .wd-de-reason-btn:hover {
+                border-color: #6E42D3;
+                background: #f8f5ff;
+                transform: translateY(-1px);
             }
 
-            ul.wd-de-reasons label input[type="radio"] {
-                position: absolute;
-                left: 0;
-                right: 0;
-                visibility: hidden;
+            .wd-de-reason-btn:active {
+                transform: translateY(0);
+            }
+
+            .wd-de-reason-btn:disabled {
+                cursor: default;
+                opacity: 0.6;
             }
 
             .wd-de-reason-text {
                 color: #4A5568;
-                font-size: 13px;
+                font-size: 12px;
+                line-height: 1.4;
             }
 
             .wd-de-reason-icon {
-                margin-bottom: 7px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
             }
 
-            ul.wd-de-reasons li.wd-de-reason-selected label {
-                background-color: #3B86FF;
-                border-color: #3B86FF;
+            ul.wd-de-reasons li.wd-de-reason-selected .wd-de-reason-btn {
+                background: #6E42D3;
+                border-color: #6E42D3;
             }
 
-            li.wd-de-reason-selected .wd-de-reason-icon svg,
-            li.wd-de-reason-selected .wd-de-reason-icon svg g {
+            ul.wd-de-reasons li.wd-de-reason-selected .wd-de-reason-icon svg,
+            ul.wd-de-reasons li.wd-de-reason-selected .wd-de-reason-icon svg g {
                 fill: #fff;
             }
 
-            li.wd-de-reason-selected .wd-de-reason-text {
+            ul.wd-de-reasons li.wd-de-reason-selected .wd-de-reason-text {
                 color: #fff;
-            }
-
-            ul.wd-de-reasons li.wd-de-reason-selected label:after {
-                display: block;
-            }
-
-            .wd-dr-modal-reason-input {
-                margin-bottom: 15px;
-                display: none;
-            }
-
-            .wd-dr-modal-reason-input textarea {
-                background: #FAFAFA;
-                border: 1px solid #287EB8;
-                border-radius: 4px;
-                width: 100%;
-                height: 100px;
-                color: #524242;
-                font-size: 13px;
-                line-height: 1.4;
-                padding: 11px 15px;
-                resize: none;
-            }
-
-            .wd-dr-modal-reason-input textarea:focus {
-                outline: 0 none;
-                box-shadow: 0 0 0;
             }
 
             .wd-dr-button-secondary,
             .wd-dr-button-secondary:hover {
                 border: 1px solid #EBEBEB;
-                border-radius: 3px;
+                border-radius: 4px;
                 font-size: 13px;
                 line-height: 1.5;
                 color: #718096;
-                padding: 5px 12px;
+                padding: 6px 14px;
                 cursor: pointer;
                 background-color: transparent;
                 text-decoration: none;
-            }
-
-            .wd-dr-submit-modal,
-            .wd-dr-submit-modal:hover {
-                border: 1px solid #3B86FF;
-                background-color: #3B86FF;
-                border-radius: 3px;
-                font-size: 13px;
-                line-height: 1.5;
-                color: #fff;
-                padding: 5px 12px;
-                cursor: pointer;
-                margin-left: 4px;
             }
         </style>
         <?php
