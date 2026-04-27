@@ -612,7 +612,8 @@ class Client {
         );
 
         if ( 'activation/plugin_deactivated' === $event ) {
-            $minimal_properties['reason'] = sanitize_text_field( (string) ( $properties['reason'] ?? 'none' ) );
+            $minimal_properties['reason']         = sanitize_text_field( (string) ( $properties['reason'] ?? 'none' ) );
+            $minimal_properties['plugin_version'] = sanitize_text_field( (string) ( $properties['plugin_version'] ?? $this->config['version'] ?? '' ) );
         }
 
         $result = $this->handlers['dispatcher']->dispatch_minimal( $event, $minimal_properties );
