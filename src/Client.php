@@ -782,6 +782,15 @@ class Client {
     }
 
     /**
+     * Get the plugin version.
+     *
+     * @return string
+     */
+    public function get_version(): string {
+        return $this->config['version'] ?? '';
+    }
+
+    /**
      * Get the unique ID for the site.
      *
      * @return string

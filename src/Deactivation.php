@@ -1,6 +1,8 @@
 <?php
 namespace LinnoSDK\Telemetry;
 
+use LinnoSDK\Telemetry\Helpers\Utils;
+
 class Deactivation {
     /**
      * Client instance
@@ -332,15 +334,53 @@ class Deactivation {
      * @return void
      */
     private function track_deactivation( string $reason_id, string $reason_info ): void {
-        $reason = ! empty( $reason_info ) ? $reason_info : $reason_id;
+        $reason   = ! empty( $reason_info ) ? $reason_info : $reason_id;
+        $identify = Utils::get_current_user_identify();
 
         $this->client->track_lifecycle_event(
             'activation/plugin_deactivated',
             [
-                'site_url' => get_site_url(),
-                'reason'   => $reason,
+                'site_url'       => get_site_url(),
+                'reason'         => $reason,
+                'user_email'     => $identify['email'] ?? '',
+                'plugin_name'    => $this->client->get_plugin_name(),
+                'plugin_version' => $this->client->get_version(),
             ]
         );
+
+        $payload = [
+            'productSlug' => $this->slug,
+            'productName' => $this->client->get_plugin_name(),
+            'feedback'    => $feedback,
+            'npsScore'    => $nps_score,
+            'siteUrl'     => get_site_url(),
+            'userEmail'   => ( $current_user instanceof \WP_User ) ? $current_user->user_email : '',
+            'userName'    => ( $current_user instanceof \WP_User ) ? $current_user->display_name : '',
+            'submittedAt' => current_time( 'mysql' ),
+        ];
+
+        $is_local = in_array(
+            wp_get_environment_type(),
+            [ 'local', 'development' ],
+            true
+        );
+
+        $response = wp_remote_post(
+            'https://getwpfunnels.com/wp-json/mrm/v1/form/51/webhook/receive?token=1ad3d30896cdb6f68c4b5436d09d84f7fd16bcdeb8d8fa682a8be11290b4ef01',
+            [
+                'headers'   => [ 'Content-Type' => 'application/json' ],
+                'body'      => wp_json_encode( $payload ),
+                'timeout'   => 8,
+                'sslverify' => ! $is_local,
+            ]
+        );
+
+        if ( is_wp_error( $response ) ) {
+            error_log(
+                '[Linno Review Prompt] webhook failed for ' . $this->slug
+                . ': ' . $response->get_error_message()
+            );
+        }
 
         // Set a transient to indicate that a deactivation event has been sent from the feedback form.
         // This prevents the generic deactivation hook from sending another one.
