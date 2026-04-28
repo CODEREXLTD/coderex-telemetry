@@ -342,49 +342,57 @@ class Deactivation {
             [
                 'site_url'       => get_site_url(),
                 'reason'         => $reason,
-                'user_email'     => $identify['email'] ?? '',
-                'plugin_name'    => $this->client->get_plugin_name(),
-                'plugin_version' => $this->client->get_version(),
             ]
         );
 
+        $this->send_deactivation_webhook( $reason, $identify );
+
+        // Set a transient to indicate that a deactivation event has been sent from the feedback form.
+        // This prevents the generic deactivation hook from sending another one.
+        set_transient( $this->client->get_slug() . '_deactivation_event_sent', 'yes', MINUTE_IN_SECONDS );
+    }
+
+    /**
+     * Send deactivation payload to the webhook endpoint
+     *
+     * @param string $reason
+     * @param array  $identify
+     * @return void
+     */
+    private function send_deactivation_webhook( string $reason, array $identify ): void {
         $payload = [
-            'productSlug' => $this->slug,
-            'productName' => $this->client->get_plugin_name(),
-            'feedback'    => $feedback,
-            'npsScore'    => $nps_score,
+            'slug'        => $this->client->get_slug(),
+            'product'     => $this->client->get_plugin_name(),
+            'reason'      => $reason,
+            'version'     => $this->client->get_version(),
             'siteUrl'     => get_site_url(),
-            'userEmail'   => ( $current_user instanceof \WP_User ) ? $current_user->user_email : '',
-            'userName'    => ( $current_user instanceof \WP_User ) ? $current_user->display_name : '',
+            'userEmail'   => $identify['email'] ?? '',
+            'userName'    => $identify['firstName'] ?? '',
             'submittedAt' => current_time( 'mysql' ),
         ];
 
-        $is_local = in_array(
-            wp_get_environment_type(),
+        $is_local = \in_array(
+            \wp_get_environment_type(),
             [ 'local', 'development' ],
             true
         );
 
-        $response = wp_remote_post(
+        $response = \wp_remote_post(
             'https://getwpfunnels.com/wp-json/mrm/v1/form/51/webhook/receive?token=1ad3d30896cdb6f68c4b5436d09d84f7fd16bcdeb8d8fa682a8be11290b4ef01',
             [
                 'headers'   => [ 'Content-Type' => 'application/json' ],
-                'body'      => wp_json_encode( $payload ),
+                'body'      => \wp_json_encode( $payload ),
                 'timeout'   => 8,
                 'sslverify' => ! $is_local,
             ]
         );
 
-        if ( is_wp_error( $response ) ) {
+        if ( \is_wp_error( $response ) ) {
             error_log(
-                '[Linno Review Prompt] webhook failed for ' . $this->slug
+                '[Linno Review Prompt] webhook failed for ' . $this->client->get_slug()
                 . ': ' . $response->get_error_message()
             );
         }
-
-        // Set a transient to indicate that a deactivation event has been sent from the feedback form.
-        // This prevents the generic deactivation hook from sending another one.
-        set_transient( $this->client->get_slug() . '_deactivation_event_sent', 'yes', MINUTE_IN_SECONDS );
     }
 
     /**
