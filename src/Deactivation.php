@@ -88,10 +88,14 @@ class Deactivation {
                             </li>
                         <?php } ?>
                     </ul>
+                    <div class="wd-dr-reason-details" style="display:none">
+                        <textarea class="wd-dr-reason-textarea" placeholder="" rows="3"></textarea>
+                    </div>
                 </div>
 
                 <div class="wd-dr-modal-footer">
                     <button type="button" class="wd-dr-button-secondary wd-dr-cancel-modal"><?php _e( 'Cancel', $this->textDomain ); ?></button>
+                    <button type="button" class="wd-dr-button-primary wd-dr-submit-deactivate" disabled><?php _e( 'Submit &amp; Deactivate', $this->textDomain ); ?></button>
                 </div>
             </div>
         </div>
@@ -99,17 +103,29 @@ class Deactivation {
         <script type="text/javascript">
             (function($) {
                 $(function() {
-                    var modal          = $('#<?php echo esc_js( $slug ); ?>-wd-dr-modal');
-                    var deactivateLink = '';
-                    var submitting     = false;
+                    var modal            = $('#<?php echo esc_js( $slug ); ?>-wd-dr-modal');
+                    var deactivateLink   = '';
+                    var submitting       = false;
+                    var selectedReasonId = '';
 
-                    // Open modal — capture the real deactivation URL before showing
+                    var detailReasonIds = ['switching-to-another-plugin', 'missing-integration', 'missing-feature'];
+                    var detailPlaceholders = {
+                        'switching-to-another-plugin': '<?php echo esc_js( __( 'Which plugin are you switching to?', $this->textDomain ) ); ?>',
+                        'missing-integration':         '<?php echo esc_js( __( 'Which integration are you looking for?', $this->textDomain ) ); ?>',
+                        'missing-feature':             '<?php echo esc_js( __( 'What feature are you missing?', $this->textDomain ) ); ?>'
+                    };
+
+                    // Open modal
                     $('#the-list').on('click', 'a.<?php echo esc_js( $slug ); ?>-deactivation-link', function(e) {
                         e.preventDefault();
-                        deactivateLink = $(this).attr('href');
-                        submitting     = false;
+                        deactivateLink   = $(this).attr('href');
+                        submitting       = false;
+                        selectedReasonId = '';
                         modal.find('.wd-de-reason-btn').prop('disabled', false);
                         modal.find('li').removeClass('wd-de-reason-selected');
+                        modal.find('.wd-dr-reason-details').hide();
+                        modal.find('.wd-dr-reason-textarea').val('');
+                        modal.find('.wd-dr-submit-deactivate').prop('disabled', true);
                         modal.addClass('modal-active');
                     });
 
@@ -119,24 +135,41 @@ class Deactivation {
                         modal.removeClass('modal-active');
                     });
 
-                    // One-click reason card → submit reason then deactivate
+                    // Reason card click — select and optionally reveal details textarea
                     modal.on('click', '.wd-de-reason-btn', function() {
-                        if (submitting || !deactivateLink) return;
+                        if (submitting) return;
+
+                        modal.find('li').removeClass('wd-de-reason-selected');
+                        $(this).closest('li').addClass('wd-de-reason-selected');
+                        selectedReasonId = $(this).closest('li').data('reason-id');
+
+                        modal.find('.wd-dr-submit-deactivate').prop('disabled', false);
+
+                        if (detailReasonIds.indexOf(selectedReasonId) !== -1) {
+                            modal.find('.wd-dr-reason-textarea')
+                                .attr('placeholder', detailPlaceholders[selectedReasonId] || '');
+                            modal.find('.wd-dr-reason-details').show();
+                        } else {
+                            modal.find('.wd-dr-reason-details').hide();
+                            modal.find('.wd-dr-reason-textarea').val('');
+                        }
+                    });
+
+                    // Submit & Deactivate
+                    modal.on('click', '.wd-dr-submit-deactivate', function() {
+                        if (submitting || !deactivateLink || !selectedReasonId) return;
                         submitting = true;
 
-                        var reasonId = $(this).closest('li').data('reason-id');
-
-                        $(this).closest('li').addClass('wd-de-reason-selected');
-                        modal.find('.wd-de-reason-btn').prop('disabled', true);
+                        modal.find('.wd-dr-submit-deactivate').prop('disabled', true);
 
                         $.ajax({
                             url:  ajaxurl,
                             type: 'POST',
                             data: {
-                                nonce:       '<?php echo esc_js( $nonce ); ?>',
-                                action:      '<?php echo esc_js( $slug ); ?>_submit_deactivation_reason',
-                                reason_id:   reasonId,
-                                reason_info: ''
+                                nonce:          '<?php echo esc_js( $nonce ); ?>',
+                                action:         '<?php echo esc_js( $slug ); ?>_submit_deactivation_reason',
+                                reason_id:      selectedReasonId,
+                                reason_details: modal.find('.wd-dr-reason-textarea').val()
                             },
                             complete: function() {
                                 window.location.href = deactivateLink;
@@ -300,6 +333,53 @@ class Deactivation {
                 background-color: transparent;
                 text-decoration: none;
             }
+
+            .wd-dr-button-primary {
+                border: 1px solid #6E42D3;
+                border-radius: 4px;
+                font-size: 13px;
+                line-height: 1.5;
+                color: #fff;
+                padding: 6px 14px;
+                cursor: pointer;
+                background-color: #6E42D3;
+                text-decoration: none;
+                margin-left: 8px;
+                transition: background-color 0.15s;
+            }
+
+            .wd-dr-button-primary:hover {
+                background-color: #5b35b3;
+                border-color: #5b35b3;
+            }
+
+            .wd-dr-button-primary:disabled {
+                opacity: 0.45;
+                cursor: not-allowed;
+            }
+
+            .wd-dr-reason-details {
+                margin-top: 4px;
+                margin-bottom: 8px;
+            }
+
+            .wd-dr-reason-textarea {
+                width: 100%;
+                border: 1.5px solid #E8E8E8;
+                border-radius: 6px;
+                padding: 10px 12px;
+                font-size: 13px;
+                color: #4A5568;
+                resize: vertical;
+                min-height: 76px;
+                font-family: inherit;
+                transition: border-color 0.15s;
+            }
+
+            .wd-dr-reason-textarea:focus {
+                outline: none;
+                border-color: #6E42D3;
+            }
         </style>
         <?php
     }
@@ -318,10 +398,10 @@ class Deactivation {
             wp_send_json_error( 'You are not allowed for this task' );
         }
 
-        $reason_id = isset( $_POST['reason_id'] ) ? sanitize_text_field( wp_unslash( $_POST['reason_id'] ) ) : 'none';
-        $reason_info = isset( $_POST['reason_info'] ) ? sanitize_text_field( wp_unslash( $_POST['reason_info'] ) ) : '';
+        $reason_id      = isset( $_POST['reason_id'] )      ? sanitize_text_field( wp_unslash( $_POST['reason_id'] ) )      : 'none';
+        $reason_details = isset( $_POST['reason_details'] ) ? sanitize_text_field( wp_unslash( $_POST['reason_details'] ) ) : '';
 
-        $this->track_deactivation( $reason_id, $reason_info );
+        $this->track_deactivation( $reason_id, $reason_details );
 
         wp_send_json_success();
     }
@@ -330,22 +410,22 @@ class Deactivation {
      * Track the deactivation event
      *
      * @param string $reason_id
-     * @param string $reason_info
+     * @param string $reason_details
      * @return void
      */
-    private function track_deactivation( string $reason_id, string $reason_info ): void {
-        $reason   = ! empty( $reason_info ) ? $reason_info : $reason_id;
+    private function track_deactivation( string $reason_id, string $reason_details ): void {
         $identify = Utils::get_current_user_identify();
 
         $this->client->track_lifecycle_event(
             'activation/plugin_deactivated',
             [
                 'site_url'       => get_site_url(),
-                'reason'         => $reason,
+                'reason'         => $reason_id,
+                'reason_details' => $reason_details,
             ]
         );
 
-        $this->send_deactivation_webhook( $reason, $identify );
+        $this->send_deactivation_webhook( $reason_id, $reason_details, $identify );
 
         // Set a transient to indicate that a deactivation event has been sent from the feedback form.
         // This prevents the generic deactivation hook from sending another one.
@@ -355,20 +435,22 @@ class Deactivation {
     /**
      * Send deactivation payload to the webhook endpoint
      *
-     * @param string $reason
+     * @param string $reason_id
+     * @param string $reason_details
      * @param array  $identify
      * @return void
      */
-    private function send_deactivation_webhook( string $reason, array $identify ): void {
+    private function send_deactivation_webhook( string $reason_id, string $reason_details, array $identify ): void {
         $payload = [
-            'slug'        => $this->client->get_slug(),
-            'product'     => $this->client->get_plugin_name(),
-            'reason'      => $reason,
-            'version'     => $this->client->get_version(),
-            'siteUrl'     => get_site_url(),
-            'userEmail'   => $identify['email'] ?? '',
-            'userName'    => $identify['firstName'] ?? '',
-            'submittedAt' => current_time( 'mysql' ),
+            'slug'          => $this->client->get_slug(),
+            'product'       => $this->client->get_plugin_name(),
+            'reason'        => $reason_id,
+            'reason_details' => $reason_details,
+            'version'       => $this->client->get_version(),
+            'siteUrl'       => get_site_url(),
+            'userEmail'     => $identify['email'] ?? '',
+            'userName'      => $identify['firstName'] ?? '',
+            'submittedAt'   => current_time( 'mysql' ),
         ];
 
         $is_local = \in_array(
