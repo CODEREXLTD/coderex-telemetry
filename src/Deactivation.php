@@ -74,7 +74,7 @@ class Deactivation {
             <div class="wd-dr-modal-wrap">
                 <div class="wd-dr-modal-header">
                     <h3><?php _e( 'Quick question before you go — what\'s the main reason?', $this->textDomain ); ?></h3>
-                    <p class="wd-dr-modal-subheading"><?php _e( 'One click is all it takes. Your feedback helps us improve.', $this->textDomain ); ?></p>
+                    <p class="wd-dr-modal-subheading"><?php _e( 'Your feedback helps us improve.', $this->textDomain ); ?></p>
                 </div>
 
                 <div class="wd-dr-modal-body">
@@ -88,10 +88,14 @@ class Deactivation {
                             </li>
                         <?php } ?>
                     </ul>
+                    <div class="wd-dr-reason-details" style="display:none">
+                        <textarea class="wd-dr-reason-textarea" placeholder="" rows="3"></textarea>
+                    </div>
                 </div>
 
                 <div class="wd-dr-modal-footer">
                     <button type="button" class="wd-dr-button-secondary wd-dr-cancel-modal"><?php _e( 'Cancel', $this->textDomain ); ?></button>
+                    <button type="button" class="wd-dr-button-primary wd-dr-submit-deactivate" disabled><?php _e( 'Submit &amp; Deactivate', $this->textDomain ); ?></button>
                 </div>
             </div>
         </div>
@@ -99,17 +103,22 @@ class Deactivation {
         <script type="text/javascript">
             (function($) {
                 $(function() {
-                    var modal          = $('#<?php echo esc_js( $slug ); ?>-wd-dr-modal');
-                    var deactivateLink = '';
-                    var submitting     = false;
+                    var modal            = $('#<?php echo esc_js( $slug ); ?>-wd-dr-modal');
+                    var deactivateLink   = '';
+                    var submitting       = false;
+                    var selectedReasonId = '';
 
                     // Open modal — capture the real deactivation URL before showing
                     $('#the-list').on('click', 'a.<?php echo esc_js( $slug ); ?>-deactivation-link', function(e) {
                         e.preventDefault();
-                        deactivateLink = $(this).attr('href');
-                        submitting     = false;
+                        deactivateLink   = $(this).attr('href');
+                        submitting       = false;
+                        selectedReasonId = '';
                         modal.find('.wd-de-reason-btn').prop('disabled', false);
                         modal.find('li').removeClass('wd-de-reason-selected');
+                        modal.find('.wd-dr-reason-details').hide();
+                        modal.find('.wd-dr-reason-textarea').val('');
+                        modal.find('.wd-dr-submit-deactivate').prop('disabled', true);
                         modal.addClass('modal-active');
                     });
 
@@ -119,15 +128,25 @@ class Deactivation {
                         modal.removeClass('modal-active');
                     });
 
-                    // One-click reason card → submit reason then deactivate
+                    // Reason card click — select and reveal detail textarea
                     modal.on('click', '.wd-de-reason-btn', function() {
-                        if (submitting || !deactivateLink) return;
+                        if (submitting) return;
+
+                        modal.find('li').removeClass('wd-de-reason-selected');
+                        $(this).closest('li').addClass('wd-de-reason-selected');
+                        selectedReasonId = $(this).closest('li').data('reason-id');
+
+                        modal.find('.wd-dr-submit-deactivate').prop('disabled', false);
+                        modal.find('.wd-dr-reason-textarea').attr('placeholder', '<?php echo esc_js( __( 'Tell us more (optional)', $this->textDomain ) ); ?>');
+                        modal.find('.wd-dr-reason-details').show();
+                    });
+
+                    // Submit & Deactivate
+                    modal.on('click', '.wd-dr-submit-deactivate', function() {
+                        if (submitting || !deactivateLink || !selectedReasonId) return;
                         submitting = true;
 
-                        var reasonId = $(this).closest('li').data('reason-id');
-
-                        $(this).closest('li').addClass('wd-de-reason-selected');
-                        modal.find('.wd-de-reason-btn').prop('disabled', true);
+                        modal.find('.wd-dr-submit-deactivate').prop('disabled', true);
 
                         $.ajax({
                             url:  ajaxurl,
@@ -135,8 +154,8 @@ class Deactivation {
                             data: {
                                 nonce:       '<?php echo esc_js( $nonce ); ?>',
                                 action:      '<?php echo esc_js( $slug ); ?>_submit_deactivation_reason',
-                                reason_id:   reasonId,
-                                reason_info: ''
+                                reason_id:   selectedReasonId,
+                                reason_info: modal.find('.wd-dr-reason-textarea').val()
                             },
                             complete: function() {
                                 window.location.href = deactivateLink;
@@ -215,6 +234,7 @@ class Deactivation {
                 display: flex;
                 align-items: center;
                 justify-content: flex-end;
+                gap: 8px;
             }
 
             ul.wd-de-reasons {
@@ -300,6 +320,52 @@ class Deactivation {
                 background-color: transparent;
                 text-decoration: none;
             }
+
+            .wd-dr-button-primary {
+                border: 1px solid #6E42D3;
+                border-radius: 4px;
+                font-size: 13px;
+                line-height: 1.5;
+                color: #fff;
+                padding: 6px 14px;
+                cursor: pointer;
+                background-color: #6E42D3;
+                text-decoration: none;
+                transition: background-color 0.15s;
+            }
+
+            .wd-dr-button-primary:hover {
+                background-color: #5b35b3;
+                border-color: #5b35b3;
+            }
+
+            .wd-dr-button-primary:disabled {
+                opacity: 0.45;
+                cursor: not-allowed;
+            }
+
+            .wd-dr-reason-details {
+                margin-top: 4px;
+                margin-bottom: 8px;
+            }
+
+            .wd-dr-reason-textarea {
+                width: 100%;
+                border: 1.5px solid #E8E8E8;
+                border-radius: 6px;
+                padding: 10px 12px;
+                font-size: 13px;
+                color: #4A5568;
+                resize: vertical;
+                min-height: 76px;
+                font-family: inherit;
+                transition: border-color 0.15s;
+            }
+
+            .wd-dr-reason-textarea:focus {
+                outline: none;
+                border-color: #6E42D3;
+            }
         </style>
         <?php
     }
@@ -318,8 +384,8 @@ class Deactivation {
             wp_send_json_error( 'You are not allowed for this task' );
         }
 
-        $reason_id = isset( $_POST['reason_id'] ) ? sanitize_text_field( wp_unslash( $_POST['reason_id'] ) ) : 'none';
-        $reason_info = isset( $_POST['reason_info'] ) ? sanitize_text_field( wp_unslash( $_POST['reason_info'] ) ) : '';
+        $reason_id   = isset( $_POST['reason_id'] )   ? sanitize_text_field( wp_unslash( $_POST['reason_id'] ) )   : 'none';
+        $reason_info = isset( $_POST['reason_info'] )  ? sanitize_text_field( wp_unslash( $_POST['reason_info'] ) ) : '';
 
         $this->track_deactivation( $reason_id, $reason_info );
 
@@ -342,10 +408,12 @@ class Deactivation {
             [
                 'site_url'       => get_site_url(),
                 'reason'         => $reason,
+                'reason_id'      => $reason_id,
+                'reason_info'    => $reason_info,
             ]
         );
 
-        $this->send_deactivation_webhook( $reason, $identify );
+        $this->send_deactivation_webhook( $reason_id, $reason_info, $identify );
 
         // Set a transient to indicate that a deactivation event has been sent from the feedback form.
         // This prevents the generic deactivation hook from sending another one.
@@ -355,15 +423,17 @@ class Deactivation {
     /**
      * Send deactivation payload to the webhook endpoint
      *
-     * @param string $reason
+     * @param string $reason_id
+     * @param string $reason_info
      * @param array  $identify
      * @return void
      */
-    private function send_deactivation_webhook( string $reason, array $identify ): void {
+    private function send_deactivation_webhook( string $reason_id, string $reason_info, array $identify ): void {
         $payload = [
             'slug'        => $this->client->get_slug(),
             'product'     => $this->client->get_plugin_name(),
-            'reason'      => $reason,
+            'reason'      => $reason_id,
+            'reason_info' => $reason_info,
             'version'     => $this->client->get_version(),
             'siteUrl'     => get_site_url(),
             'userEmail'   => $identify['email'] ?? '',
@@ -449,4 +519,3 @@ class Deactivation {
         return apply_filters( $this->client->get_slug() . '_telemetry_deactivation_reasons', $reasons );
     }
 }
-
