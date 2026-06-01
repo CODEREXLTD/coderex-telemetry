@@ -458,17 +458,14 @@ class Client {
      * @return void
      */
     public function activate(): void {
-        // Track activation without consent using minimal non-personal payload.
-        if ( ! get_option( $this->config['slug'] . '_telemetry_activated_tracked' ) ) {
-            $this->track_lifecycle_event(
-                'activation/plugin_activated',
-                [
-                    'site_url' => get_site_url(),
-                ]
-            );
+        $this->track_lifecycle_event(
+            'activation/plugin_activated',
+            [
+                'site_url' => get_site_url(),
+            ]
+        );
 
-            update_option( $this->config['slug'] . '_telemetry_activated_tracked', 'yes' );
-        }
+        update_option( $this->config['slug'] . '_telemetry_activated_tracked', 'yes' );
     }
 
     /**

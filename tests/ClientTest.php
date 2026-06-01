@@ -129,17 +129,19 @@ class ClientTest extends TestCase
         $this->addToAssertionCount( 1 );
     }
 
-    public function testActivateDoesNotResendWhenAlreadyTracked(): void
+    public function testActivateAlwaysSendsEvenWhenPreviouslyTracked(): void
     {
         $driver = $this->makeDriver();
-        $driver->shouldReceive( 'send' )->never();
+        $driver->shouldReceive( 'send' )
+               ->with( 'activation/plugin_activated', Mockery::type( 'array' ) )
+               ->once()
+               ->andReturn( true );
 
         update_option( 'my-plugin_telemetry_activated_tracked', 'yes' );
 
         $client = $this->makeClient( [], $driver );
         $client->activate();
 
-        // Mockery verifies `send` was never called; add explicit count to avoid PHPUnit risky warning.
         $this->addToAssertionCount( 1 );
     }
 
