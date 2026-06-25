@@ -229,7 +229,10 @@ class Utils {
             'profileId' => self::getSiteProfileId(),
         ];
 
-        if ( function_exists( 'wp_get_current_user' ) ) {
+        // Only attach PII for site administrators. Student/subscriber accounts
+        // trigger events (e.g. purchases) while logged in, which would otherwise
+        // overwrite the site owner's PostHog/OpenPanel profile with student data.
+        if ( function_exists( 'wp_get_current_user' ) && current_user_can( 'manage_options' ) ) {
             $current_user = wp_get_current_user();
             if ( $current_user && $current_user->ID > 0 ) {
                 $identify['email']     = $current_user->user_email;
